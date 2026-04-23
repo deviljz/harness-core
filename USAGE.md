@@ -92,27 +92,51 @@ harness check --skip-gate --reason "紧急修复，测试环境挂了"
 
 ---
 
-## 4. 4 层流程（完整闭环）
+## 4. 4 层流程（Claude Code 里用 slash command）
 
-想跑完整"方案 → 执行 → 审查 → 验证"：
+**推荐方式**：在 Claude Code 里直接敲 `/harness-*` 命令，AI 必须按 skill 定义执行，比自然语言更明确。
 
-```bash
-# 方案层：写 spec（6 段 + complexity 字段）
-harness plan new my-task
-# 编辑 docs/tasks/my-task.md 填 6 段
-harness plan validate docs/tasks/my-task.md
+| 命令 | 用途 |
+|------|------|
+| `/harness-plan <任务名>` | 起草 spec 骨架 → 引导填 6 段 → 自动 validate |
+| `/harness-execute <spec路径>` | 按 spec 逐项实现（simple 直接做 / complex 起 subagent）|
+| `/harness-review <spec路径>` | 起独立 subagent 对比 diff 与 spec，找偏差 |
+| `/harness-check [args]` | 跑验证，支持 `--gate` / `--on-edit path` / `--warn-only` |
 
-# 执行层：按 spec 执行表逐项实现
-harness execute docs/tasks/my-task.md
+### 典型流程
 
-# 审查层：对比 diff 与 spec
-harness review --spec docs/tasks/my-task.md
+```
+你：/harness-plan 打卡记录支持重新提交
+AI：[调 harness plan new，引导你填 Objective/Commands/Structure/...]
+    [填完跑 harness plan validate，通过]
 
-# 验证层：跑测试 + gate
-harness check --gate
+你：/harness-execute docs/tasks/20260423_xxx.md
+AI：[读 spec 的 complexity]
+    [按 Structure 列出的文件逐个改]
+    [每改完 hook 自动 harness check --on-edit 验证]
+
+你：/harness-review docs/tasks/20260423_xxx.md
+AI：[跑 harness review-data 拿 diff+spec+template]
+    [用 Agent 工具起 subagent 审查]
+    [输出 consistent: true/false + issues]
+
+你：/harness-check --gate
+AI：✅ gate passed
 ```
 
-> 日常小改（bug fix / 改 UI）只跑 `harness check` 就够，不用强制 4 层。
+### 日常小改不用走 4 层
+
+单文件 bug fix / 改 UI → PostToolUse hook 会自动跑 `harness check --on-edit`，不用手动。
+
+### CLI 直接调用（不在 Claude Code 里）
+
+```bash
+harness plan new my-task
+harness plan validate docs/tasks/my-task.md
+harness execute docs/tasks/my-task.md
+harness review --spec docs/tasks/my-task.md
+harness check --gate
+```
 
 ---
 
@@ -143,6 +167,8 @@ harness resume       # 恢复被熔断中断的流程
 
 - `.harness/config.yaml` 入库（共享）
 - `.harness/run_hook.py` 入库（wrapper，没装 harness 时静默 exit 0）
+- `.claude/commands/harness-*.md` 入库（4 个 slash command 模板）
+- `.claude/settings.json` 入库（hook 配置）
 - `.harness/check_cache.json` **不入库**（本地缓存）
 - `reports/` **不入库**（测试产物）
 

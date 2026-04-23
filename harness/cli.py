@@ -11,6 +11,14 @@ from rich.console import Console
 from . import __version__
 from .config import ConfigError, find_config, load_config, project_root as _project_root
 
+# Windows 下强制 UTF-8，避免 rich 输出 ✓ ✗ 等 unicode 字符挂 gbk
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
 console = Console()
 err_console = Console(stderr=True)
 
@@ -221,10 +229,31 @@ def execute(spec_path: str):
 # ════════════════════════════════════════════════════════════════════
 
 
-@main.command(help="对最近 diff 做 review（对照 spec）")
+@main.command("review-data", help="打包 diff+spec 为 JSON（供 skill 给 subagent 用）")
 @click.option("--spec", "spec_path", type=click.Path(exists=True), default=None)
-@click.option("--base", type=str, default="HEAD", help="git diff base (默认 HEAD)")
+@click.option("--base", type=str, default="HEAD", help="git diff base")
+def review_data(spec_path: str | None, base: str):
+    """skill 模式：打印 {spec_content, diff_content, template} JSON 到 stdout"""
+    from .review.diff_packager import package_diff
+
+    cfg_path = find_config()
+    root = _project_root(cfg_path)
+    packed = package_diff(
+        root,
+        Path(spec_path) if spec_path else None,
+        diff_base=base,
+    )
+    # 加 prompt template
+    template_path = Path(__file__).parent / "review" / "prompt_template.md"
+    packed["template"] = template_path.read_text(encoding="utf-8") if template_path.exists() else ""
+    print(json.dumps(packed, ensure_ascii=False, indent=2))
+
+
+@main.command(help="对最近 diff 做 review（直接调 LLM provider；推荐走 skill 更灵活）")
+@click.option("--spec", "spec_path", type=click.Path(exists=True), default=None)
+@click.option("--base", type=str, default="HEAD", help="git diff base")
 def review(spec_path: str | None, base: str):
+    """走 LLM provider（manual / 将来的 openai 等）。skill 模式下推荐 review-data。"""
     from .llm import get_provider
     from .review import run_review
 

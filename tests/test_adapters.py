@@ -19,6 +19,22 @@ class TestInstallHooks:
         assert "PostToolUse" in data["hooks"]
         assert "Stop" in data["hooks"]
 
+    def test_installs_wrapper_script(self, tmp_path):
+        install_hooks(tmp_path)
+        wrapper = tmp_path / ".harness" / "run_hook.py"
+        assert wrapper.exists()
+        content = wrapper.read_text(encoding="utf-8")
+        assert "shutil.which" in content  # 优雅降级核心
+        assert "return 0" in content  # 没装 harness 时静默
+
+    def test_hook_command_uses_wrapper(self, tmp_path):
+        install_hooks(tmp_path)
+        data = json.loads((tmp_path / ".claude" / "settings.json").read_text(encoding="utf-8"))
+        post_cmd = data["hooks"]["PostToolUse"][0]["hooks"][0]["command"]
+        stop_cmd = data["hooks"]["Stop"][0]["hooks"][0]["command"]
+        assert "python .harness/run_hook.py" in post_cmd
+        assert "python .harness/run_hook.py" in stop_cmd
+
     def test_local_scope(self, tmp_path):
         path = install_hooks(tmp_path, scope="local")
         assert path.name == "settings.local.json"

@@ -29,5 +29,8 @@ harness = "harness.cli:main"
 include = ["harness*"]
 exclude = ["tests*"]
 
+[tool.setuptools.package-data]
+"harness.review" = ["prompt_template.md"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

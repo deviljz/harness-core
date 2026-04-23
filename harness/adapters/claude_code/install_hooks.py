@@ -12,10 +12,12 @@ Stop → run_hook.py check --gate
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 from typing import Literal
 
 HOOK_MARKER = "harness-core"
+_COMMANDS_SRC = Path(__file__).parent / "commands"
 
 
 # run_hook.py: 装在项目 .harness/ 下，hook 调它。
@@ -98,7 +100,25 @@ def install_hooks(
         json.dumps(data, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
+
+    # 3) 安装 slash commands 到 .claude/commands/
+    _install_commands(claude_dir)
+
     return settings_path
+
+
+def _install_commands(claude_dir: Path) -> list[Path]:
+    """复制 harness-* slash command 到项目 .claude/commands/。已存在则覆盖（保持最新）。"""
+    dst_dir = claude_dir / "commands"
+    dst_dir.mkdir(exist_ok=True)
+    installed: list[Path] = []
+    if not _COMMANDS_SRC.exists():
+        return installed
+    for src in _COMMANDS_SRC.glob("harness-*.md"):
+        dst = dst_dir / src.name
+        shutil.copyfile(src, dst)
+        installed.append(dst)
+    return installed
 
 
 def uninstall_hooks(project_root: Path, scope: Literal["shared", "local"] = "shared") -> Path | None:

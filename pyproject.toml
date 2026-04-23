@@ -31,6 +31,7 @@ exclude = ["tests*"]
 
 [tool.setuptools.package-data]
 "harness.review" = ["prompt_template.md"]
+"harness.adapters.claude_code" = ["commands/*.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

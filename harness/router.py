@@ -144,12 +144,17 @@ def route_file(
 
     matched: list[str] = []
     for target in config.targets:
-        root_norm = normalize_path(target.root).rstrip("/") + "/"
-        # 匹配：文件路径以 target.root 开头（规范化后）
-        if rel == root_norm.rstrip("/") or rel.startswith(root_norm):
+        root_norm = normalize_path(target.root).rstrip("/")
+        # "." 或 "" 表示整个项目根 → 匹配所有文件
+        if root_norm in ("", "."):
+            target_matches = True
+        else:
+            prefix = root_norm + "/"
+            target_matches = rel == root_norm or rel.startswith(prefix)
+
+        if target_matches:
             ig, _reason = is_ignored(rel, config, target)
             if ig:
-                # 命中 target 但被该 target 的 ignore 过滤
                 continue
             matched.append(target.name)
 

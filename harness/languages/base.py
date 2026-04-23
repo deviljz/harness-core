@@ -130,3 +130,15 @@ def run_command(
                    + (e.stderr.decode(errors="replace") if e.stderr else ""),
             duration_ms=duration_ms,
         )
+    except FileNotFoundError as e:
+        # 工具没装（flutter / npm / pytest 等），用 exit_code=127 标记
+        # 下游 parse/runner 可据此降级为 skip 而不是 crash
+        duration_ms = int((time.monotonic() - start) * 1000)
+        return TestRunResult(
+            cmd=cmd_str,
+            cwd=str(cwd),
+            exit_code=127,
+            stdout="",
+            stderr=f"[harness] executable not found: {e}",
+            duration_ms=duration_ms,
+        )

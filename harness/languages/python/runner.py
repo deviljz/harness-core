@@ -155,12 +155,16 @@ def _count_per_test_markers(out: str) -> dict[str, int]:
     counts = {"passed": 0, "failed": 0, "skipped": 0, "errors": 0}
     for m in _PER_TEST_RE.finditer(out):
         kind = m.group(1)
-        if kind in ("PASSED", "XPASS"):
+        if kind == "PASSED":
             counts["passed"] += 1
-        elif kind in ("FAILED", "XFAIL"):
+        elif kind == "FAILED":
             counts["failed"] += 1
-        elif kind == "SKIPPED":
+        elif kind in ("SKIPPED", "XFAIL"):
+            # XFAIL = expected fail，pytest 语义视作 pass/skip，不算失败
             counts["skipped"] += 1
+        elif kind == "XPASS":
+            # XPASS = 预期失败但通过，默认视为 pass
+            counts["passed"] += 1
         elif kind == "ERROR":
             counts["errors"] += 1
     return counts

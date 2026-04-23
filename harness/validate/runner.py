@@ -75,7 +75,10 @@ def _run_target(target: TargetConfig, project_root: Path, changed_file: str | No
     dt = int((time.monotonic() - t0) * 1000)
 
     status: str
-    if parsed.errors > 0 or parsed.failed > 0:
+    # exit_code=127 = run_command 捕到 FileNotFoundError（工具没装）→ 降级 skip
+    if raw.exit_code == 127:
+        status = "skip"
+    elif parsed.errors > 0 or parsed.failed > 0:
         status = "fail"
     elif parsed.passed == 0:
         status = "warn"

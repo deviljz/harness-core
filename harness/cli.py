@@ -330,8 +330,8 @@ def check(on_edit, gate_mode, dry_run, warn_only, skip_gate, reason):
         err_console.print(f"[red]✗ gate denied: {result.reason}[/red]")
         sys.exit(1)
 
-    # ── on-edit: 增量缓存 ─────────────────────────────────────
-    if on_edit and cfg.incremental_cache.enabled:
+    # ── on-edit: 增量缓存（dry-run 跳过缓存）─────────────────
+    if on_edit and cfg.incremental_cache.enabled and not dry_run:
         cache = IncrementalCache(
             root / ".harness" / "check_cache.json",
             cfg.incremental_cache.debounce_seconds,

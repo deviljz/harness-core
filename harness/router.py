@@ -144,14 +144,7 @@ def route_file(
 
     matched: list[str] = []
     for target in config.targets:
-        root_norm = normalize_path(target.root).rstrip("/")
-        # "." 或 "" 表示整个项目根 → 匹配所有文件
-        if root_norm in ("", "."):
-            target_matches = True
-        else:
-            prefix = root_norm + "/"
-            target_matches = rel == root_norm or rel.startswith(prefix)
-
+        target_matches = _file_matches_target(rel, target)
         if target_matches:
             ig, _reason = is_ignored(rel, config, target)
             if ig:
@@ -159,3 +152,16 @@ def route_file(
             matched.append(target.name)
 
     return RouteResult(ignored=False, matched_targets=tuple(matched))
+
+
+def _file_matches_target(rel: str, target: TargetConfig) -> bool:
+    """文件路径命中 target 的任一 root 或 test_paths"""
+    candidates = [target.root] + list(target.test_paths or [])
+    for candidate in candidates:
+        norm = normalize_path(candidate).rstrip("/")
+        if norm in ("", "."):
+            return True
+        prefix = norm + "/"
+        if rel == norm or rel.startswith(prefix):
+            return True
+    return False

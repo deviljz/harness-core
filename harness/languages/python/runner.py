@@ -110,6 +110,13 @@ def parse_pytest_output(raw: TestRunResult) -> TestResult:
     skipped = int(summary.group("skipped") or 0) if summary else 0
     errors = int(summary.group("errors") or 0) if summary else 0
 
+    # Fallback：summary 行缺失（如项目 addopts 里有 -p no:capture 等配置）
+    # 直接从 per-test 行里数 PASSED/FAILED/SKIPPED/ERROR 计数
+    if summary is None or (passed == 0 and failed == 0 and skipped == 0 and errors == 0):
+        fb = _count_per_test_markers(out)
+        if any(fb.values()):
+            passed, failed, skipped, errors = fb["passed"], fb["failed"], fb["skipped"], fb["errors"]
+
     # collection error 特殊处理：pytest 输出 "ERRORS" 章节 + 非 0 退出
     if raw.exit_code != 0 and passed == 0 and failed == 0 and errors == 0:
         if "no tests ran" not in out.lower():
@@ -135,6 +142,28 @@ def parse_pytest_output(raw: TestRunResult) -> TestResult:
         failures=failures,
         raw_output=out[-4000:],  # 截断，防塞满 AI context
     )
+
+
+_PER_TEST_RE = re.compile(
+    r"^(?:\S+::)?\S+\s+(PASSED|FAILED|SKIPPED|ERROR|XFAIL|XPASS)\b",
+    re.MULTILINE,
+)
+
+
+def _count_per_test_markers(out: str) -> dict[str, int]:
+    """当 summary 行缺失时的兜底：逐条测试行数 PASSED/FAILED/SKIPPED/ERROR"""
+    counts = {"passed": 0, "failed": 0, "skipped": 0, "errors": 0}
+    for m in _PER_TEST_RE.finditer(out):
+        kind = m.group(1)
+        if kind in ("PASSED", "XPASS"):
+            counts["passed"] += 1
+        elif kind in ("FAILED", "XFAIL"):
+            counts["failed"] += 1
+        elif kind == "SKIPPED":
+            counts["skipped"] += 1
+        elif kind == "ERROR":
+            counts["errors"] += 1
+    return counts
 
 
 def _extract_traceback(out: str, test_name: str) -> str:

@@ -94,6 +94,7 @@ def _make_config() -> HarnessConfig:
                 name="backend",
                 root="app/",
                 language="python",
+                test_paths=["tests/"],
                 ignore_paths=["app/migrations/**", "**/*.pyc"],
             ),
             TargetConfig(
@@ -172,5 +173,12 @@ class TestRouteFile:
         (tmp_path / "app").mkdir()
         (tmp_path / "app" / "x.py").touch()
         r = route_file(tmp_path / "app" / "x.py", cfg, tmp_path)
+        assert not r.ignored
+        assert r.matched_targets == ("backend",)
+
+    def test_test_path_also_routes(self, tmp_path):
+        """tests/ 下的文件也应该路由到 backend（通过 test_paths 匹配）"""
+        cfg = _make_config()
+        r = route_file("tests/test_foo.py", cfg, tmp_path)
         assert not r.ignored
         assert r.matched_targets == ("backend",)

@@ -35,10 +35,11 @@ def main():
 
 
 @main.command(help="在当前项目生成 .harness/ 骨架 + 装 hook")
-@click.option("--force", is_flag=True, help="已存在时覆盖 config.yaml")
+@click.option("--force", is_flag=True, help="强制覆盖框架文件（run_hook.py + commands）；不动 config.yaml")
+@click.option("--reset-config", is_flag=True, help="显式重置 config.yaml 到默认模板（危险：丢 targets 等所有用户配置）")
 @click.option("--local", is_flag=True, help="hook 写入 .claude/settings.local.json（不入 git）")
 @click.option("--no-hooks", is_flag=True, help="跳过 Claude Code hook 安装")
-def init(force: bool, local: bool, no_hooks: bool):
+def init(force: bool, reset_config: bool, local: bool, no_hooks: bool):
     from .adapters.claude_code import install_hooks
 
     cwd = Path.cwd()
@@ -46,8 +47,12 @@ def init(force: bool, local: bool, no_hooks: bool):
     harness_dir.mkdir(exist_ok=True)
 
     cfg_path = harness_dir / "config.yaml"
-    if cfg_path.exists() and not force:
-        console.print(f"[yellow]! {cfg_path} already exists (use --force to overwrite)[/yellow]")
+    if cfg_path.exists():
+        if reset_config:
+            cfg_path.write_text(_CONFIG_TEMPLATE.format(project=cwd.name), encoding="utf-8")
+            console.print(f"[yellow]![/yellow] {cfg_path} reset to default template")
+        else:
+            console.print(f"[dim]config.yaml 保留（如需重置请加 --reset-config）[/dim]")
     else:
         cfg_path.write_text(_CONFIG_TEMPLATE.format(project=cwd.name), encoding="utf-8")
         console.print(f"[green]✓[/green] {cfg_path}")

@@ -81,6 +81,7 @@ class HarnessConfig(BaseModel):
     project: str
     llm: LLMConfig = Field(default_factory=LLMConfig)
     ignore_paths_global: list[str] = Field(default_factory=list)
+    trigger_on_edit_paths: list[str] = Field(default_factory=list)
     circuit_breaker: CircuitBreakerConfig = Field(default_factory=CircuitBreakerConfig)
     incremental_cache: IncrementalCacheConfig = Field(default_factory=IncrementalCacheConfig)
     plan: PlanConfig = Field(default_factory=PlanConfig)

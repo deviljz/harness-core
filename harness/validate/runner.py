@@ -69,6 +69,10 @@ def _run_target(target: TargetConfig, project_root: Path, changed_file: str | No
     test_files: list[str] = []
     if changed_file:
         test_files = mod.find_related_tests(changed_file, target_dict, project_root)
+        # on-edit 触发但找不到相关测试 → 直接 skip，不 fallback 跑全量
+        # （修 BullshitDetector 类问题：编辑 README 不应触发全部 pytest）
+        if not test_files:
+            return []
     t0 = time.monotonic()
     raw = mod.run_tests(test_files, target_dict, project_root)
     parsed = mod.parse_results(raw)

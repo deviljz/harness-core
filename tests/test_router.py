@@ -162,6 +162,28 @@ class TestRouteFile:
         assert not r.ignored
         assert r.matched_targets == ()
 
+    def test_trigger_on_edit_paths_whitelist_rejects_non_match(self, tmp_path):
+        """trigger_on_edit_paths 白名单设置后，不匹配的文件视为 ignored。"""
+        cfg = _make_config()
+        cfg = cfg.model_copy(update={"trigger_on_edit_paths": ["app/**/*.py", "mobile/lib/**"]})
+        r = route_file("README.md", cfg, tmp_path)
+        assert r.ignored
+        assert "trigger_on_edit_paths" in r.ignore_reason
+
+    def test_trigger_on_edit_paths_whitelist_accepts_match(self, tmp_path):
+        cfg = _make_config()
+        cfg = cfg.model_copy(update={"trigger_on_edit_paths": ["app/**/*.py"]})
+        r = route_file("app/prompt_builder.py", cfg, tmp_path)
+        assert not r.ignored
+        assert r.matched_targets == ("backend",)
+
+    def test_trigger_on_edit_paths_empty_preserves_legacy(self, tmp_path):
+        """未设置 trigger_on_edit_paths 时行为与旧版一致（不影响 README 路由）。"""
+        cfg = _make_config()
+        # 空列表 = 无白名单
+        r = route_file("random_readme.md", cfg, tmp_path)
+        assert not r.ignored
+
     def test_windows_path_with_backslash(self, tmp_path):
         cfg = _make_config()
         r = route_file("app\\prompt_builder.py", cfg, tmp_path)

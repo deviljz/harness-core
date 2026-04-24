@@ -142,6 +142,14 @@ def route_file(
     if ignored:
         return RouteResult(ignored=True, ignore_reason=reason)
 
+    # 1b. trigger_on_edit_paths 白名单：设置了就只有白名单内的文件算触发
+    if config.trigger_on_edit_paths:
+        if not any(match_glob(rel, p) for p in config.trigger_on_edit_paths):
+            return RouteResult(
+                ignored=True,
+                ignore_reason=f"not in trigger_on_edit_paths",
+            )
+
     matched: list[str] = []
     for target in config.targets:
         target_matches = _file_matches_target(rel, target)

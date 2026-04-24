@@ -1,5 +1,5 @@
 ---
-description: 用 harness 为新任务写 spec（6 段 + complexity）
+description: 用 harness 为新任务写 spec（7 段 + complexity）
 argument-hint: <task-name>
 ---
 
@@ -17,13 +17,16 @@ argument-hint: <task-name>
 ## 起草模式流程
 
 1. 运行 `harness plan new "$ARGUMENTS"` 生成骨架，记录输出路径。
-2. 基于会话内容**直接起草** 6 段 + complexity 字段，一次性给用户看完整草稿：
+2. 基于会话内容**直接起草** 7 段 + complexity 字段，一次性给用户看完整草稿：
    ```
    ## Objective
    [从讨论中提炼的目标]
 
+   ## User Flow
+   [逐步用户动线：1. 用户在 X 页点 Y → 2. 看到 Z → 3. ...]
+
    ## Commands
-   ...（以此类推 6 段）
+   ...（以此类推 7 段）
 
    complexity: simple | complex
    ```
@@ -35,8 +38,9 @@ argument-hint: <task-name>
 ## 引导模式流程（讨论不足时）
 
 1. 运行 `harness plan new "$ARGUMENTS"`。
-2. 按 6 大区逐个问**封闭问题**（"目标用户是谁？"而不是"介绍一下这个任务"）：
+2. 按 7 大区逐个问**封闭问题**（"目标用户是谁？"而不是"介绍一下这个任务"）：
    - **Objective**：一句话目标 + 可验证的成功标准
+   - **User Flow**：逐步用户动线（上传 → 看到什么 → 点什么 → 结果）。**UI 相关任务必填**；纯后端/工具类可写 "N/A - 无用户交互"
    - **Commands**：需要跑的命令（测试/构建/lint）
    - **Structure**：涉及的文件/模块列表
    - **Style**：编码规范（如有特殊要求）

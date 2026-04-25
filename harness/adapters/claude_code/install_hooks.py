@@ -56,8 +56,13 @@ if __name__ == "__main__":
 def install_hooks(
     project_root: Path,
     scope: Literal["shared", "local"] = "shared",
+    with_gate: bool = False,
 ) -> Path:
-    """注册 hook。返回被写入的 settings 文件路径。"""
+    """注册 hook。返回被写入的 settings 文件路径。
+
+    with_gate=False（默认）：只装 PostToolUse（每次 Edit/Write 后增量验证）
+    with_gate=True：额外装 Stop hook（每轮对话结束跑 --gate 全量校验）
+    """
     # 1) 写 run_hook.py
     harness_dir = project_root / ".harness"
     harness_dir.mkdir(exist_ok=True)
@@ -79,9 +84,9 @@ def install_hooks(
 
     hooks = data.setdefault("hooks", {})
 
-    # 用 python 调 wrapper，跨平台
-    on_edit_cmd = f'python .harness/run_hook.py check --on-edit "$CLAUDE_TOOL_FILE_PATH" --warn-only  # {HOOK_MARKER}'
-    gate_cmd = f'python .harness/run_hook.py check --gate  # {HOOK_MARKER}'
+    # 用 python 调 wrapper，$CLAUDE_PROJECT_DIR 保证任何 cwd 下都能找到 wrapper
+    on_edit_cmd = f'python "$CLAUDE_PROJECT_DIR/.harness/run_hook.py" check --on-edit "$CLAUDE_TOOL_FILE_PATH" --warn-only  # {HOOK_MARKER}'
+    gate_cmd = f'python "$CLAUDE_PROJECT_DIR/.harness/run_hook.py" check --gate  # {HOOK_MARKER}'
 
     post = hooks.setdefault("PostToolUse", [])
     if not _already_installed(post, HOOK_MARKER):
@@ -92,9 +97,10 @@ def install_hooks(
             }
         )
 
-    stop = hooks.setdefault("Stop", [])
-    if not _already_installed(stop, HOOK_MARKER):
-        stop.append({"hooks": [{"type": "command", "command": gate_cmd}]})
+    if with_gate:
+        stop = hooks.setdefault("Stop", [])
+        if not _already_installed(stop, HOOK_MARKER):
+            stop.append({"hooks": [{"type": "command", "command": gate_cmd}]})
 
     settings_path.write_text(
         json.dumps(data, indent=2, ensure_ascii=False),

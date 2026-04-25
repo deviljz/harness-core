@@ -82,6 +82,16 @@ def _run_target(target: TargetConfig, project_root: Path, changed_file: str | No
     # exit_code=127 = run_command 捕到 FileNotFoundError（工具没装）→ 降级 skip
     if raw.exit_code == 127:
         status = "skip"
+    # pytest exit 5 = "no tests collected"（项目还没写测试或测试目录空）；
+    # 与"测试都失败"语义不同，应 skip 不是 warn
+    elif (
+        target.language == "python"
+        and raw.exit_code == 5
+        and parsed.passed == 0
+        and parsed.failed == 0
+        and parsed.errors == 0
+    ):
+        status = "skip"
     elif parsed.errors > 0 or parsed.failed > 0:
         status = "fail"
     elif parsed.passed == 0:

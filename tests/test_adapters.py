@@ -17,7 +17,15 @@ class TestInstallHooks:
         data = json.loads(path.read_text(encoding="utf-8"))
         assert "hooks" in data
         assert "PostToolUse" in data["hooks"]
+        # 默认不装 Stop hook（避免每轮对话都跑 --gate）
+        assert "Stop" not in data["hooks"]
+
+    def test_with_gate_installs_stop_hook(self, tmp_path):
+        install_hooks(tmp_path, with_gate=True)
+        data = json.loads((tmp_path / ".claude" / "settings.json").read_text(encoding="utf-8"))
         assert "Stop" in data["hooks"]
+        stop_cmd = data["hooks"]["Stop"][0]["hooks"][0]["command"]
+        assert "--gate" in stop_cmd
 
     def test_installs_wrapper_script(self, tmp_path):
         install_hooks(tmp_path)
@@ -31,9 +39,7 @@ class TestInstallHooks:
         install_hooks(tmp_path)
         data = json.loads((tmp_path / ".claude" / "settings.json").read_text(encoding="utf-8"))
         post_cmd = data["hooks"]["PostToolUse"][0]["hooks"][0]["command"]
-        stop_cmd = data["hooks"]["Stop"][0]["hooks"][0]["command"]
-        assert "python .harness/run_hook.py" in post_cmd
-        assert "python .harness/run_hook.py" in stop_cmd
+        assert 'python "$CLAUDE_PROJECT_DIR/.harness/run_hook.py"' in post_cmd
 
     def test_local_scope(self, tmp_path):
         path = install_hooks(tmp_path, scope="local")

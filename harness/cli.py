@@ -39,7 +39,8 @@ def main():
 @click.option("--reset-config", is_flag=True, help="显式重置 config.yaml 到默认模板（危险：丢 targets 等所有用户配置）")
 @click.option("--local", is_flag=True, help="hook 写入 .claude/settings.local.json（不入 git）")
 @click.option("--no-hooks", is_flag=True, help="跳过 Claude Code hook 安装")
-def init(force: bool, reset_config: bool, local: bool, no_hooks: bool):
+@click.option("--with-gate", is_flag=True, help="额外装 Stop hook（每轮对话结束跑 --gate）；默认不装避免在没改代码的对话中也触发全量")
+def init(force: bool, reset_config: bool, local: bool, no_hooks: bool, with_gate: bool):
     from .adapters.claude_code import install_hooks
 
     cwd = Path.cwd()
@@ -64,7 +65,7 @@ def init(force: bool, reset_config: bool, local: bool, no_hooks: bool):
 
     if not no_hooks:
         scope = "local" if local else "shared"
-        path = install_hooks(cwd, scope=scope)
+        path = install_hooks(cwd, scope=scope, with_gate=with_gate)
         console.print(f"[green]✓[/green] hooks installed: {path}")
 
     console.print("\nNext steps:")
@@ -306,6 +307,14 @@ def check(on_edit, gate_mode, dry_run, warn_only, skip_gate, reason):
     from .reporter import render_markdown, render_xml_compact, save_check_json, save_markdown
     from .validate import evaluate_gate, run_checks
     from .validate.cache import IncrementalCache
+
+    # 空串特判：Claude Code hook 在某些场景（NotebookEdit / 多文件 MultiEdit / 删除）
+    # 会传 $CLAUDE_TOOL_FILE_PATH="" 进来。下游用 `if changed_file:` 判断，空串会被
+    # 误认为"未指定文件"从而 fallback 跑全量 pytest（曾导致 PyQt UI 测试弹窗抢焦点）。
+    # 显式空串视为 hook race，静默 skip；和"完全不传 --on-edit（manual 全量）"语义不同。
+    if on_edit is not None and not on_edit.strip():
+        console.print("[dim]skipped: empty --on-edit (likely hook race / non-file edit)[/dim]")
+        return
 
     if skip_gate and not reason:
         err_console.print('[red]--skip-gate requires --reason "..."[/red]')

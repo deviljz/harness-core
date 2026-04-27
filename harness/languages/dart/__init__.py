@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
 
 from ..base import LanguageModule, TestResult, TestRunResult, run_command
@@ -66,7 +67,13 @@ class DartModule(LanguageModule):
                 except ValueError:
                     cmd_parts.append(tf)
 
-        return run_command(cmd_parts, cwd, timeout=target_config.get("timeout", 600))
+        # Windows 下 flutter 是 .bat 脚本，subprocess(shell=False) 不会按 PATHEXT 解析
+        # → 用 shell 字符串走 cmd.exe，可正确解析到 flutter.bat
+        if sys.platform == "win32":
+            cmd: str | list[str] = " ".join(cmd_parts)
+        else:
+            cmd = cmd_parts
+        return run_command(cmd, cwd, timeout=target_config.get("timeout", 600))
 
     def parse_results(self, raw: TestRunResult) -> TestResult:
         """flutter test 输出解析。

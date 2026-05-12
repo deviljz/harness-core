@@ -1,4 +1,4 @@
-"""spec 合规校验：检查 6 大区 + complexity 字段都存在"""
+"""spec 合规校验：检查 7 大区 + complexity 字段都存在"""
 from __future__ import annotations
 
 import re
@@ -21,6 +21,14 @@ REQUIRED_SECTIONS = [
     "Boundaries",
 ]
 
+# 推荐但不强制的段（缺失时仅 warning，不阻塞 validate）。
+# - User Flow: UI 类任务用户动线 trace，纯后端可写 N/A
+# - Data Migration: 防止"加字段 + 按字段过滤但不回填"这类盲区
+RECOMMENDED_SECTIONS = [
+    "User Flow",
+    "Data Migration",
+]
+
 
 def validate_spec(spec_path: Path) -> list[ValidationIssue]:
     """校验 spec 文档。返回问题列表（空 = 通过）"""
@@ -34,13 +42,25 @@ def validate_spec(spec_path: Path) -> list[ValidationIssue]:
 
     issues: list[ValidationIssue] = []
 
-    # 1. 6 大区全在
+    # 1. 必填段全在
     for section in REQUIRED_SECTIONS:
         # 接受 "## 1. Objective" / "## Objective" 两种
         pattern = rf"^##\s+(?:\d+\.\s+)?{re.escape(section)}"
         if not re.search(pattern, content, re.MULTILINE):
             issues.append(
                 ValidationIssue("error", f"missing required section: {section}")
+            )
+
+    # 1b. 推荐段缺失 → warning（避免老 spec 突然 fail）
+    for section in RECOMMENDED_SECTIONS:
+        pattern = rf"^##\s+(?:\d+\.\s+)?{re.escape(section)}"
+        if not re.search(pattern, content, re.MULTILINE):
+            issues.append(
+                ValidationIssue(
+                    "warning",
+                    f"missing recommended section: {section} "
+                    f"（涉及持久化/数据存储变更时必须显式说明迁移策略，否则填 N/A）",
+                )
             )
 
     # 2. complexity 字段

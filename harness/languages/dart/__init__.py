@@ -85,14 +85,16 @@ class DartModule(LanguageModule):
           Some tests failed.
         """
         out = raw.stdout + "\n" + raw.stderr
-        # 末尾出现 +N 或 -N
-        passed_match = re.search(r"\+(\d+)", out)
-        failed_match = re.search(r"-(\d+)\s*:", out)
-        skipped_match = re.search(r"~(\d+)", out)
+        # expanded reporter 每行格式：00:01 +N [-M] [~K]: description
+        # 取最后一次出现的计数（累计值），避免 "+0: loading..." 早期行干扰
+        passed_matches = re.findall(r"\+(\d+)", out)
+        # -N 必须跟在 +N 之后（space 分隔），避免匹配时间戳里的负号
+        failed_matches = re.findall(r"(?<=\s)-(\d+)", out)
+        skipped_matches = re.findall(r"~(\d+)", out)
 
-        passed = int(passed_match.group(1)) if passed_match else 0
-        failed = int(failed_match.group(1)) if failed_match else 0
-        skipped = int(skipped_match.group(1)) if skipped_match else 0
+        passed = int(passed_matches[-1]) if passed_matches else 0
+        failed = int(failed_matches[-1]) if failed_matches else 0
+        skipped = int(skipped_matches[-1]) if skipped_matches else 0
 
         # 非 0 退出但没统计到 → 挂 1 个错误
         errors = 0

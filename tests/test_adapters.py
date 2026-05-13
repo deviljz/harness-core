@@ -17,8 +17,11 @@ class TestInstallHooks:
         data = json.loads(path.read_text(encoding="utf-8"))
         assert "hooks" in data
         assert "PostToolUse" in data["hooks"]
-        # 默认不装 Stop hook（避免每轮对话都跑 --gate）
-        assert "Stop" not in data["hooks"]
+        # 默认不装 --gate Stop hook，但会装 active-tasks Stop hook
+        assert "Stop" in data["hooks"]
+        stop_cmds = [h.get("command", "") for e in data["hooks"]["Stop"] for h in e.get("hooks", [])]
+        assert not any("--gate" in c for c in stop_cmds)
+        assert any("check_active_tasks" in c for c in stop_cmds)
 
     def test_with_gate_installs_stop_hook(self, tmp_path):
         install_hooks(tmp_path, with_gate=True)

@@ -281,7 +281,14 @@ def review_data(spec_path: str | None, base: str):
     # 加 prompt template
     template_path = Path(__file__).parent / "review" / "prompt_template.md"
     packed["template"] = template_path.read_text(encoding="utf-8") if template_path.exists() else ""
-    print(json.dumps(packed, ensure_ascii=False, indent=2))
+    # 用 ensure_ascii=True 把所有非 ASCII 字符转义为 \uXXXX，输出为纯 ASCII。
+    # 这样在任何 locale（包括 Windows GBK/cp936）下 python -m json.tool 等管道工具
+    # 都能正确解析，同时 json.loads 仍会自动还原 \uXXXX 为 Unicode。
+    # 直接写 bytes 到 stdout.buffer，绕过 Windows 文本模式的 \n→\r\n 转换。
+    out = json.dumps(packed, ensure_ascii=True, indent=2)
+    sys.stdout.buffer.write(out.encode("ascii"))
+    sys.stdout.buffer.write(b"\n")
+    sys.stdout.buffer.flush()
 
 
 @main.command(help="对最近 diff 做 review（直接调 LLM provider；推荐走 skill 更灵活）")

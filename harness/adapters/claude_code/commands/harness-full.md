@@ -7,6 +7,24 @@ argument-hint: <spec-path>
 
 ## 执行步骤
 
+### 第 0 步：登记任务（必须最先做）
+在启动任何 subagent 之前，**立即**调用以下逻辑把所有待完成步骤写入 `.harness/active_tasks.json`：
+
+```python
+# 伪代码——用 Bash 工具执行等价操作
+import json, pathlib
+data = {"pending": ["execute", "check", "review", "commit"], "completed": []}
+pathlib.Path(".harness").mkdir(exist_ok=True)
+pathlib.Path(".harness/active_tasks.json").write_text(json.dumps(data, indent=2))
+```
+
+或直接用 Write 工具写入 `.harness/active_tasks.json`：
+```json
+{"pending": ["execute", "check", "review", "commit"], "completed": []}
+```
+
+**不写这个文件 → Stop hook 会误放行 → 流程会提前终止。**
+
 ### 第 1 步：execute
 按 `.claude/commands/harness-execute.md` 的规则跑：
 - 读 spec，确认 complexity
@@ -14,19 +32,22 @@ argument-hint: <spec-path>
 - 按 Structure 区列出的文件逐项改
 - PostToolUse hook 自动跑 `harness check --on-edit` 增量验证
 - 单个 hook fail → **当场自修**，不打断流程
+- **execute subagent 完成后立即**：把 `execute` 从 pending 移到 completed（更新 active_tasks.json）
 
 ### 第 2 步：check（全量）
 所有改动完成后，运行 `harness check`，解析 XML 报告：
-- `all_green="true"` → 进入第 3 步
+- `all_green="true"` → 把 `check` 从 pending 移到 completed → 进入第 3 步
 - 有 fail → 读 raw_output 定位根因 → **自修一次** → 重跑
-- 连续 2 次失败 → 停下来汇报具体哪个 test 红、根因是什么，**不要继续 review/commit**
+- 连续 2 次失败 → 把 `check` 保留在 pending → **清空 active_tasks.json（`{"pending":[],"completed":[]}`)** → 停下来汇报
 
 ### 第 3 步：review
 按 `.claude/commands/harness-review.md` 的规则跑：
 - `harness review-data --spec "$ARGUMENTS"` 拿 JSON
 - 起新的 subagent 跑 Pass A（功能实现）
 - 若 spec 有 User Flow 段且非 N/A → 起第二个新 subagent 跑 Pass B（用户流程可达性）
-- 合并 issues，整体 `consistent: false` 时 → **停下来列出所有 issues**，不进入 commit
+- 合并 issues：
+  - `consistent: true` → 把 `review` 从 pending 移到 completed → 进入 commit
+  - `consistent: false` → **清空 active_tasks.json** → 停下来列出所有 issues，不进入 commit
 
 ### 第 4 步：commit
 全部绿后：
@@ -35,6 +56,7 @@ argument-hint: <spec-path>
 - 写 commit message：`feat: 完成 spec <spec-名>` + spec 里 Objective 段一句话摘要
 - `git add` 仅 spec 列出的 Structure 文件 + 测试文件 + spec 本身（不要 add 未追踪的临时文件）
 - commit 到 dev（不 push，让用户决定是否 push）
+- **commit 成功后**：把 `commit` 从 pending 移到 completed，**清空 active_tasks.json**（`{"pending":[],"completed":[]}`）
 
 ### 第 5 步：汇报
 最后打印：
@@ -64,10 +86,13 @@ argument-hint: <spec-path>
 ## 硬约束
 
 - **全程不问用户**：不弹 AskUserQuestion、不调 EnterPlanMode
-- check / review 失败时**不要继续往后跑**
+- **第 0 步必须最先做**：在任何 subagent 之前写好 active_tasks.json，否则 Stop hook 无法正确工作
+- **subagent 完成后禁止输出 final text**：立即更新 active_tasks.json，然后直接起下一个 subagent
+- check / review 失败时**不要继续往后跑**，并清空 active_tasks.json 再汇报
 - commit 前必须验证 dev 分支
 - subagent 必须独立起新会话（不复用 SendMessage）
 - 每步 fail 自修上限 1 次，超过就停
+- **active_tasks.json 格式固定**：`{"pending": [...], "completed": [...]}`，不要加其他字段
 
 ## 何时该用
 

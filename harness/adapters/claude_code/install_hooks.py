@@ -17,7 +17,56 @@ from pathlib import Path
 from typing import Literal
 
 HOOK_MARKER = "harness-core"
+ACTIVE_TASKS_MARKER = "harness-active-tasks"
 _COMMANDS_SRC = Path(__file__).parent / "commands"
+
+
+# check_active_tasks.py: 装在项目 .harness/ 下，Stop hook 调它。
+# 作用：读 .harness/active_tasks.json，有未完成任务时 exit 2 阻止 Claude 停下来。
+# 格式：{"pending": ["step1", ...], "completed": ["step0"]}
+CHECK_ACTIVE_TASKS_SCRIPT = '''#!/usr/bin/env python
+"""harness active-tasks Stop hook
+
+由 `harness init` 自动生成。读 .harness/active_tasks.json：
+- pending 非空 → exit 2，输出 reason 让 Claude 继续
+- 文件不存在或 pending 为空 → exit 0，正常停止
+"""
+from __future__ import annotations
+import json
+import os
+import sys
+from pathlib import Path
+
+
+def main() -> int:
+    project_dir = os.environ.get("CLAUDE_PROJECT_DIR", ".")
+    tasks_file = Path(project_dir) / ".harness" / "active_tasks.json"
+
+    if not tasks_file.exists():
+        return 0  # 没有文件 → 没有待办 → 允许停
+
+    try:
+        data = json.loads(tasks_file.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return 0  # 读取失败 → 静默放行
+
+    pending = data.get("pending", [])
+    if not pending:
+        return 0  # 全部完成 → 允许停
+
+    # 有未完成任务 → exit 2 触发 Claude 继续
+    tasks_str = ", ".join(pending)
+    print(
+        f"[harness] 还有未完成的任务: {tasks_str}\\n"
+        f"请继续执行下一个任务，不要停下来。",
+        flush=True,
+    )
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+'''
 
 
 # run_hook.py: 装在项目 .harness/ 下，hook 调它。
@@ -57,17 +106,24 @@ def install_hooks(
     project_root: Path,
     scope: Literal["shared", "local"] = "shared",
     with_gate: bool = False,
+    with_active_tasks: bool = True,
 ) -> Path:
     """注册 hook。返回被写入的 settings 文件路径。
 
     with_gate=False（默认）：只装 PostToolUse（每次 Edit/Write 后增量验证）
     with_gate=True：额外装 Stop hook（每轮对话结束跑 --gate 全量校验）
+    with_active_tasks=True（默认）：装 check_active_tasks.py + Stop hook，
+        让 harness-full 多 subagent 跑完前阻止 Claude 中途停止
     """
-    # 1) 写 run_hook.py
+    # 1) 写 run_hook.py + check_active_tasks.py
     harness_dir = project_root / ".harness"
     harness_dir.mkdir(exist_ok=True)
     wrapper = harness_dir / "run_hook.py"
     wrapper.write_text(RUN_HOOK_SCRIPT, encoding="utf-8")
+
+    if with_active_tasks:
+        check_script = harness_dir / "check_active_tasks.py"
+        check_script.write_text(CHECK_ACTIVE_TASKS_SCRIPT, encoding="utf-8")
 
     # 2) 更新 settings
     claude_dir = project_root / ".claude"
@@ -101,6 +157,12 @@ def install_hooks(
         stop = hooks.setdefault("Stop", [])
         if not _already_installed(stop, HOOK_MARKER):
             stop.append({"hooks": [{"type": "command", "command": gate_cmd}]})
+
+    if with_active_tasks:
+        active_tasks_cmd = f'python "$CLAUDE_PROJECT_DIR/.harness/check_active_tasks.py"  # {ACTIVE_TASKS_MARKER}'
+        stop = hooks.setdefault("Stop", [])
+        if not _already_installed(stop, ACTIVE_TASKS_MARKER):
+            stop.append({"hooks": [{"type": "command", "command": active_tasks_cmd}]})
 
     settings_path.write_text(
         json.dumps(data, indent=2, ensure_ascii=False),
@@ -143,7 +205,11 @@ def uninstall_hooks(project_root: Path, scope: Literal["shared", "local"] = "sha
     hooks = data.get("hooks", {})
     for phase in ("PostToolUse", "Stop"):
         entries = hooks.get(phase, [])
-        hooks[phase] = [e for e in entries if not _already_installed([e], HOOK_MARKER)]
+        hooks[phase] = [
+            e for e in entries
+            if not _already_installed([e], HOOK_MARKER)
+            and not _already_installed([e], ACTIVE_TASKS_MARKER)
+        ]
         if not hooks[phase]:
             hooks.pop(phase, None)
 

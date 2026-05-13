@@ -10,6 +10,7 @@
 """
 from __future__ import annotations
 
+import fnmatch
 import logging
 import re
 from dataclasses import dataclass
@@ -86,6 +87,19 @@ def _relative(p: Path, project_root: Path) -> str:
         return p.as_posix()
 
 
+def _is_ignored(rel_posix: str, ignore_patterns: list[str]) -> bool:
+    """检查相对路径（posix）是否匹配任意 ignore glob 模式。"""
+    for pat in ignore_patterns:
+        if fnmatch.fnmatch(rel_posix, pat):
+            return True
+        # 支持 "scripts/**" 形式：也匹配 "scripts/foo.py"
+        if pat.endswith("/**"):
+            prefix = pat[:-3]
+            if rel_posix == prefix or rel_posix.startswith(prefix + "/"):
+                return True
+    return False
+
+
 def _rules_for_file(file_path: Path, anti_patterns: dict[str, list[AntiPatternRule]]) -> list[AntiPatternRule]:
     ext = file_path.suffix.lower()
     lang = EXT_TO_LANG.get(ext)
@@ -138,16 +152,23 @@ def run_anti_patterns(
             message="no anti_patterns configured",
         )
 
+    ignore = config.ignore_paths_global  # list[str]，缺省为 []
+
     findings: list[AntiPatternFinding] = []
     if changed_file:
         p = Path(changed_file)
         if not p.is_absolute():
             p = (project_root / changed_file).resolve()
-        rules = _rules_for_file(p, config.anti_patterns)
-        if rules and p.exists():
-            findings.extend(scan_file(p, rules, project_root))
+        rel = _relative(p, project_root)
+        if not _is_ignored(rel, ignore):
+            rules = _rules_for_file(p, config.anti_patterns)
+            if rules and p.exists():
+                findings.extend(scan_file(p, rules, project_root))
     else:
         for p in _iter_tracked_files(project_root):
+            rel = _relative(p, project_root)
+            if _is_ignored(rel, ignore):
+                continue
             rules = _rules_for_file(p, config.anti_patterns)
             if rules:
                 findings.extend(scan_file(p, rules, project_root))

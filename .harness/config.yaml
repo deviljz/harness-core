@@ -1,0 +1,49 @@
+# harness-core config
+project: harness-core
+
+llm:
+  provider: claude_agent  # claude_agent | manual
+
+ignore_paths_global:
+  - .git/**
+  - "**/__pycache__/**"
+  - "**/node_modules/**"
+  - "**/*.log"
+  - "**/.pytest_cache/**"
+  - reports/**
+
+circuit_breaker:
+  max_retries: 3
+  same_error_limit: 2
+
+incremental_cache:
+  enabled: true
+  debounce_seconds: 30
+
+plan:
+  spec_dir: docs/tasks
+  require_complexity_field: true
+
+execute:
+  complexity_source: spec_field
+
+review:
+  enabled: true
+  focus: [api_contract, error_handling]
+
+# 在这里按需添加 target
+targets: []
+  # - name: backend
+  #   root: app/
+  #   language: python
+  #   test_paths: [tests/]
+  #   ignore_paths:
+  #     - app/migrations/**
+  #   checks:
+  #     assertion_ast:
+  #       forbid_tautology: true
+
+gate:
+  require_evidence: true
+  evidence_source: harness_report
+  max_age_seconds: 300

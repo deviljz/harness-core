@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "harness-core"
-version = "0.1.0"
+version = "0.2.0"
 description = "AI-assisted development harness: plan/execute/review/validate lifecycle"
 authors = [{ name = "jinzhe" }]
 readme = "README.md"

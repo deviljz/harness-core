@@ -123,6 +123,35 @@ gate:
   require_evidence: true
   evidence_source: harness_report
   max_age_seconds: 300
+
+# 反模式正则检查（跨语言静态扫描）。取消注释开启。
+# 顶层 key = 语言名（dart/python/typescript/javascript/go/rust/java/kotlin/swift），"all" 对所有扩展名生效。
+# anti_patterns:
+#   dart:
+#     - name: self_recursive_getter
+#       pattern: '^\\s*\\w+(\\?|<[^>]+>)?\\s+get\\s+(\\w+)\\s*=>\\s*\\2\\s*;'
+#       msg: "自递归 getter 必爆栈 (StackOverflowError)"
+#       severity: error
+#   python:
+#     - name: bare_except
+#       pattern: '^\\s*except\\s*:\\s*$'
+#       msg: "禁止裸 except"
+#       severity: error
+#     - name: mutable_default_arg
+#       pattern: 'def \\w+\\([^)]*=\\s*(\\[\\]|\\{{\\}})\\s*[,)]'
+#       msg: "可变默认参数跨调用共享状态，用 None"
+#       severity: error
+#   all:
+#     - name: api_key_leak
+#       pattern: '(AIza[0-9A-Za-z_-]{{35}}|sk-[a-zA-Z0-9]{{20,}}|ghp_[a-zA-Z0-9]{{36}})'
+#       msg: "疑似 API Key 硬编码，必须移到 .env"
+#       severity: error
+
+# 核心模块测试覆盖检查。改到 path 时要求 must_have_test 存在，否则 warn。
+# core_modules_coverage:
+#   - path: mobile/lib/screens/main_tab_screen.dart
+#     must_have_test: mobile/test/main_tab_screen_test.dart
+#     reason: "打卡入口，曾因自递归 getter 爆栈"
 """
 
 

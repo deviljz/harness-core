@@ -68,6 +68,25 @@ class TargetConfig(BaseModel):
     checks: dict = Field(default_factory=dict)
 
 
+class AntiPatternRule(BaseModel):
+    """单条反模式规则，按语言挂在顶层 anti_patterns 段下"""
+    model_config = ConfigDict(extra="allow")
+    name: str
+    pattern: str
+    msg: str = ""
+    severity: str = "warn"  # "error" | "warn"
+    multiline: bool = False
+    case: Optional[str] = None  # 现场案例引用，文档用
+
+
+class CoreModuleEntry(BaseModel):
+    """核心模块测试覆盖映射"""
+    model_config = ConfigDict(extra="allow")
+    path: str
+    must_have_test: str
+    reason: Optional[str] = None
+
+
 class GateConfig(BaseModel):
     model_config = ConfigDict(extra="allow")
     require_evidence: bool = True
@@ -89,6 +108,8 @@ class HarnessConfig(BaseModel):
     review: ReviewConfig = Field(default_factory=ReviewConfig)
     targets: list[TargetConfig] = Field(default_factory=list)
     gate: GateConfig = Field(default_factory=GateConfig)
+    anti_patterns: dict[str, list[AntiPatternRule]] = Field(default_factory=dict)
+    core_modules_coverage: list[CoreModuleEntry] = Field(default_factory=list)
 
 
 # ════════════════════════════════════════════════════════════════════

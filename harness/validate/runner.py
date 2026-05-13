@@ -7,6 +7,8 @@ from pathlib import Path
 from ..config import HarnessConfig, TargetConfig
 from ..languages import get_language_module
 from ..reporter import CheckResult, ValidationReport, make_session_id
+from .anti_patterns import run_anti_patterns
+from .core_modules import run_core_modules_coverage
 
 
 def run_checks(
@@ -31,6 +33,12 @@ def run_checks(
         if target.name not in target_names_to_run:
             continue
         results.extend(_run_target(target, project_root, changed_file))
+
+    # Cross-target checks (与 target 解耦，全局跑)
+    if config.anti_patterns:
+        results.append(run_anti_patterns(config, project_root, changed_file))
+    if config.core_modules_coverage:
+        results.append(run_core_modules_coverage(config, project_root, changed_file))
 
     return ValidationReport(
         session_id=make_session_id(),

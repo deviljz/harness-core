@@ -65,5 +65,6 @@ Respond **only** in this format:
 - `consistent: true` means the change fully implements what spec asks without violating boundaries.
 - `consistent: false` means there's at least one deviation. List each in `issues`.
 - Keep `issues` short and specific (one sentence each, point to file:line when possible).
+- **Issue 措辞优先用中文术语**：「集成测试」「测试数据」「mock 替代真实业务」「UI 入口缺失」「数据源」「空列表」「迁移策略」等。spec 是中文时尤其要保持术语一致，避免 "Integration test" 这类英文混入导致下游匹配失败。
 
 Focus: {focus}

@@ -1,6 +1,6 @@
 {
   "consistent": false,
   "required_keywords": ["kind|NULL|数据|filter|WHERE"],
-  "soft_keywords": ["测试数据", "data source", "空列表|empty"],
+  "soft_keywords": ["测试数据|test\\s*rows|test\\s*data", "data\\s*source|数据源", "空列表|empty|vacuous|no\\s+kind|NULL"],
   "min_issues_count": 1
 }

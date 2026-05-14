@@ -49,6 +49,11 @@ Check whether the code change:
    - **用项目对应的 DB 工具（sqlite3 / psql / mysql / mongosh / redis-cli 等）抽查至少 5 行真实数据**，确认能匹配过滤条件
    - 若新增了过滤字段（如 WHERE kind='X'）但老数据该字段为 NULL/缺失 → 报"数据源 file:line 按 X 过滤但现有数据全部不匹配"
 7. 若 spec 说"上传后立即看到 X"但代码在 `if (已答完 Y)` 里才渲染入口 → 报 `文件:行号 - 门槛 A，spec 要求 B`
+8. **ORM / 框架级"自动覆盖"反误报**（防止把声明式实现误报为缺失）：spec 要求"启动跑迁移"/"schema drift 检查加表字段"等持久化类约束时，下结论前**必须 grep 工程**确认是否已通过框架自动覆盖：
+   - 报"startup 没跑 migration"前：`grep -rn 'create_all\|Base.metadata' app/ src/`，若 startup 有调用 `init_db()` / `Base.metadata.create_all()` 且新 model 已声明 → SQLAlchemy 等 ORM 会自动建新表，迁移已覆盖，**不报**
+   - 报"drift 检查没加表字段断言"前：读 `check_schema_drift.py` / 同类脚本，若用 `Base.metadata.tables.values()` / `inspect(engine)` 动态遍历 → 新 model 自动覆盖，**不报**
+   - 报"未注册路由"前：grep `include_router` / `app.add_url_rule` / `@app.route`，若新 router 已注册 → **不报**
+   - 通用原则：先确认"框架级声明能否在运行时自动生效"，再判定 spec 要求是否真未实现。**spec 字面找不到对应代码 ≠ 未实现**。
 
 ### Step 3: 综合判断
 - 任意 Step 1/2 命中 issue → consistent: false

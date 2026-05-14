@@ -63,7 +63,12 @@ push-back 时给 subagent 的 prompt 模板：
 - 起新的 subagent 跑单 Pass 审查（模板含 Structure + User Flow trace + 数据源 + 集成测试全套核对）
 - 返回 JSON：
   - `consistent: true` → 把 `review` 从 pending 移到 completed → 进入 commit
-  - `consistent: false` → **清空 active_tasks.json** → 停下来列出所有 issues，不进入 commit
+  - `consistent: false` → **进入自修循环**（与 check 行为对齐，不直接停）：
+    1. 逐条判定 issue 是真是假 — LLM review 常误报"框架声明式约束"（init_db 已 create_all、metadata-based drift、include_router 已注册），先 grep 工程验证
+    2. 真 issue 自修 + spec 也需要修就改 spec（路径偏差、轻微措辞）
+    3. 重跑 `harness review-data` → 起**新** subagent 重 review
+    4. 还 `consistent: false` → **清空 active_tasks.json** → 列出剩余 issues 停下来
+    5. 自修上限 2 轮，超过仍 fail 才停（与 check 自修一次的逻辑一致但 review 容忍 2 轮，因为 issue 类型更多样）
 
 ### 第 4 步：commit
 全部绿后：
@@ -104,11 +109,12 @@ push-back 时给 subagent 的 prompt 模板：
 - **全程不问用户**：不弹 AskUserQuestion、不调 EnterPlanMode
 - **第 0 步必须最先做**：在任何 subagent 之前写好 active_tasks.json，否则 Stop hook 无法正确工作
 - **subagent 完成后禁止输出 final text**：立即更新 active_tasks.json，然后直接起下一个 subagent
-- check / review 失败时**不要继续往后跑**，并清空 active_tasks.json 再汇报
+- check / review **自修循环用尽后**才停（不是 fail 当下就停），停时清空 active_tasks.json 再汇报
 - commit 前必须验证 dev 分支
 - subagent 必须独立起新会话（不复用 SendMessage）
-- 每步 fail 自修上限 1 次，超过就停
+- 自修上限：check 1 轮、review 2 轮（review issue 类型更多样，多给 1 轮先验证误报）
 - **active_tasks.json 格式固定**：`{"pending": [...], "completed": [...]}`，不要加其他字段
+- **优先级**：用户 memory 含 autonomous / 自主迭代类偏好时，review fail 必须先走自修循环，**不允许第一时间停下来问用户**。skill 的"停下来汇报"是兜底，不是默认动作。
 
 ## 何时该用
 

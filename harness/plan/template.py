@@ -58,7 +58,17 @@ DEFAULT_SPEC_TEMPLATE = """# {task_name}
 
 ## 6. Testing（测试策略）
 
--
+> **测试矩阵（必填）**：对照 §2 User Flow 列出每个分支节点对应的测试用例 + 关键断言点。
+> **happy path 端到端覆盖**：必须有一条测试真走完 §2 全部主路径，**禁止用 force_* / skip_* / mock 业务逻辑等参数抄近道绕过分支**。
+
+| 分支节点（对应 User Flow 第 N 步） | 测试用例 | 关键断言 |
+|---|---|---|
+| 例：步骤 3 OCR 拍照判定整篇 vs 片段 | tests/test_xxx.py::test_full_essay_enters_feedback | DB.current_essay_text 非空 + stage='feedback' |
+| 例：步骤 5 多轮反馈累积 | tests/test_xxx.py::test_feedback_accumulates | feedback_summary 含 ≥2 轮 |
+
+- 单元测试：
+- 集成测试：
+- E2E：
 
 ---
 

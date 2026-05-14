@@ -49,7 +49,12 @@ Check whether the code change:
    - **用项目对应的 DB 工具（sqlite3 / psql / mysql / mongosh / redis-cli 等）抽查至少 5 行真实数据**，确认能匹配过滤条件
    - 若新增了过滤字段（如 WHERE kind='X'）但老数据该字段为 NULL/缺失 → 报"数据源 file:line 按 X 过滤但现有数据全部不匹配"
 7. 若 spec 说"上传后立即看到 X"但代码在 `if (已答完 Y)` 里才渲染入口 → 报 `文件:行号 - 门槛 A，spec 要求 B`
-8. **ORM / 框架级"自动覆盖"反误报**（防止把声明式实现误报为缺失）：spec 要求"启动跑迁移"/"schema drift 检查加表字段"等持久化类约束时，下结论前**必须 grep 工程**确认是否已通过框架自动覆盖：
+8. **测试覆盖率检查（关键）**：对照 spec "## 2. User Flow" 段列出的**每个分支节点**，到测试代码（单元 / 集成 / E2E）grep 对应断言：
+   - User Flow 第 N 步的关键 symbol / 数据状态（如"OCR 整篇" / "多轮反馈" / "stage=done" / "award_reward 触发"），测试里必须有对应 assert
+   - **抄近道反模式**：E2E 脚本如果用 `force_*=true` / `skip_*=true` / `mock 业务逻辑参数` 绕过本该走真实路径的分支节点 → 报 "测试用 force_xxx 抄近道绕过 User Flow 步骤 N，未真实覆盖该分支"
+   - **断言强度**：测试只检查"API 返回非空 + status_code=200"算弱断言。spec 涉及的 DB 字段（essay_text/feedback_summary/stage 等）测试中必须有 assert，否则报"测试断言过弱，未验证 spec 要求的最终数据状态"
+   - 覆盖率门槛：spec User Flow 列出 N 个分支节点，测试覆盖 < N/2 → 报"测试覆盖率不足，missing branches: X, Y, Z"
+9. **ORM / 框架级"自动覆盖"反误报**（防止把声明式实现误报为缺失）：spec 要求"启动跑迁移"/"schema drift 检查加表字段"等持久化类约束时，下结论前**必须 grep 工程**确认是否已通过框架自动覆盖：
    - 报"startup 没跑 migration"前：`grep -rn 'create_all\|Base.metadata' app/ src/`，若 startup 有调用 `init_db()` / `Base.metadata.create_all()` 且新 model 已声明 → SQLAlchemy 等 ORM 会自动建新表，迁移已覆盖，**不报**
    - 报"drift 检查没加表字段断言"前：读 `check_schema_drift.py` / 同类脚本，若用 `Base.metadata.tables.values()` / `inspect(engine)` 动态遍历 → 新 model 自动覆盖，**不报**
    - 报"未注册路由"前：grep `include_router` / `app.add_url_rule` / `@app.route`，若新 router 已注册 → **不报**

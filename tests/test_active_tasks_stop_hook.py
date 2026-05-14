@@ -151,6 +151,37 @@ class TestInstallHooksActiveTasks:
         # 不重复安装
         assert len([c for c in all_cmds if ACTIVE_TASKS_MARKER in c]) == 1
 
+    def test_active_tasks_clears_legacy_gate_hook(self, tmp_path):
+        """0.3.2: 装 active_tasks 时（with_gate=False 默认），自动清掉老 harness-core gate Stop hook。"""
+        from harness.adapters.claude_code.install_hooks import HOOK_MARKER
+        (tmp_path / ".claude").mkdir()
+        settings = tmp_path / ".claude" / "settings.json"
+        # 模拟既有老 gate Stop hook
+        existing = {
+            "hooks": {
+                "Stop": [{"hooks": [{"type": "command", "command": f"python old --gate  # {HOOK_MARKER}"}]}]
+            }
+        }
+        settings.write_text(json.dumps(existing), encoding="utf-8")
+
+        install_hooks(tmp_path)  # with_gate=False, with_active_tasks=True
+        data = json.loads(settings.read_text(encoding="utf-8"))
+        stop_entries = data["hooks"]["Stop"]
+        all_cmds = [h.get("command", "") for e in stop_entries for h in e.get("hooks", [])]
+        # 老 gate hook 被清掉
+        assert not any(f"# {HOOK_MARKER}" in c and "--gate" in c for c in all_cmds)
+        # 新 active-tasks hook 装上
+        assert any(ACTIVE_TASKS_MARKER in c for c in all_cmds)
+
+    def test_active_tasks_with_gate_keeps_both(self, tmp_path):
+        """0.3.2: with_gate=True 时不清理，保留 gate + active_tasks 双 Stop hook。"""
+        from harness.adapters.claude_code.install_hooks import HOOK_MARKER
+        install_hooks(tmp_path, with_gate=True)
+        data = json.loads((tmp_path / ".claude" / "settings.json").read_text(encoding="utf-8"))
+        all_cmds = [h.get("command", "") for e in data["hooks"]["Stop"] for h in e.get("hooks", [])]
+        assert any(f"# {HOOK_MARKER}" in c and "--gate" in c for c in all_cmds)
+        assert any(ACTIVE_TASKS_MARKER in c for c in all_cmds)
+
 
 # ---------------------------------------------------------------------------
 # active_tasks_helper 函数

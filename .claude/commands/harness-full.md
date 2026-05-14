@@ -34,6 +34,23 @@ pathlib.Path(".harness/active_tasks.json").write_text(json.dumps(data, indent=2)
 - 单个 hook fail → **当场自修**，不打断流程
 - **execute subagent 完成后立即**：把 `execute` 从 pending 移到 completed（更新 active_tasks.json）
 
+#### 偷工模式 push-back（强制）
+subagent 完成后**必须**扫描其报告文字，命中以下任一模式即视为"未完成 spec 要求"，必须**重起 subagent 续做**而非视为通过：
+
+- 「**先跳过 UI 入口** / 先不做 UI / UI 入口暂时不加 / UI 留后续」
+- 「**留 service API 可调** / 留接口给后续 / 暂未接入 UI」
+- 「**主动触发暂时不做** / 主动按钮暂时跳过 / 仅留 service / 仅留 API」
+- 「**先实现核心逻辑**（暗示 UI / 触发点没做）」
+- 「**X 没有就跳过** / 找不到 X 就略过」（如 spec 要求改某文件但实际跳过）
+
+唯一豁免：subagent 报告**明确说明**为什么 spec 该要求不可实现（如"spec 写要改 file X 但文件不存在且 spec 无创建说明"），并且**主 AI 必须复核**该解释合理才能放行。
+
+push-back 时给 subagent 的 prompt 模板：
+```
+你上次的报告里出现「先跳过 UI 入口」等措辞，但 spec 第 X 段明确要求 <具体功能>。
+请补做：<具体要求>。完整实现，不要再跳过。
+```
+
 ### 第 2 步：check（全量）
 所有改动完成后，运行 `harness check`，解析 XML 报告：
 - `all_green="true"` → 把 `check` 从 pending 移到 completed → 进入第 3 步

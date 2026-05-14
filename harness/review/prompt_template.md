@@ -35,15 +35,20 @@ Check whether the code change:
 3. 只有文件**真的不存在** 或 内容**真的与 spec 不符** 才作为 issue
 4. diff_content 是参考，**工作树状态是真相**
 
-### Step 2: User Flow 步骤逐条 trace（无论 Pass A/B 都必做）
+### Step 2: User Flow 步骤逐条 trace
 1. 如果 spec "## 2. User Flow" 段非 "N/A"，**逐条**列出每个用户动线步骤
 2. 对每一步：
    - 找代码里的实际入口（grep widget 名 / API 路径 / 按钮文案 / icon name）
    - 用 Read 看入口附近的 guard / 条件渲染 / 路由跳转
    - 验证**实际可达**：用户按 spec 描述的路径操作，能不能真的看到/触发那个功能
-3. 偷工模式硬禁：subagent 实现报告里如出现 "**先跳过 UI 入口**" / "**留 service API 可调**" / "**主动触发暂时不做**" 这类妥协措辞，对应 spec User Flow 段如要求 UI 触发，**必须报 issue**（不允许 spec 写"用户 X 点 Y 按钮"但代码里没那个按钮）
-4. spec Testing 段如要求"模拟器/真机手工 E2E 验收"，diff 里**必须**有 reports/ 截图记录或 commit message 提及实测；没有的话报 issue：「Spec 要求手工 E2E 验收但 diff 无任何实测痕迹（reports/ 无新截图、commit message 无'实测/截图'字样）」
+3. 偷工模式硬禁：subagent 实现报告里如出现 "**先跳过 UI 入口**" / "**留 service API 可调**" / "**主动触发暂时不做**" 这类妥协措辞，对应 spec User Flow 段如要求 UI 触发，**必须报 issue**
+4. spec Testing 段如要求"模拟器/真机手工 E2E 验收"，diff 里**必须**有 reports/ 截图记录或 commit message 提及实测；没有的话报 issue：「Spec 要求手工 E2E 验收但 diff 无任何实测痕迹」
 5. HTTP / 数据库 / 外部依赖类改动如只有 mock 单测，没有任何"真实链路"集成测试，spec Testing 段又要求"集成测试"的，报 issue：「<file> 只有 mock 单测，spec 要求集成测试，未见真实 HTTP/DB 链路验证」
+6. **数据源 trace（关键）**：若 flow 步骤是"看到列表/历史/X 的集合"这类**数据展示**类，必须 trace 到数据源（DB query / API 调用 / 缓存 / 文件）：
+   - 找到查询的过滤条件（WHERE 子句、参数）
+   - **用项目对应的 DB 工具（sqlite3 / psql / mysql / mongosh / redis-cli 等）抽查至少 5 行真实数据**，确认能匹配过滤条件
+   - 若新增了过滤字段（如 WHERE kind='X'）但老数据该字段为 NULL/缺失 → 报"数据源 file:line 按 X 过滤但现有数据全部不匹配"
+7. 若 spec 说"上传后立即看到 X"但代码在 `if (已答完 Y)` 里才渲染入口 → 报 `文件:行号 - 门槛 A，spec 要求 B`
 
 ### Step 3: 综合判断
 - 任意 Step 1/2 命中 issue → consistent: false

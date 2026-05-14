@@ -58,6 +58,12 @@ class TestReviewTemplateConstraints:
         """spec 要求集成测试但只有 mock 单测时应报 issue"""
         assert "只有 mock 单测" in self.template
 
+    def test_data_source_trace_present(self):
+        """0.3.2: Pass B 的数据源 trace 合并到 Pass A 模板"""
+        assert "数据源 trace" in self.template
+        # 抽查 5 行真实数据的硬约束
+        assert "5 行真实数据" in self.template
+
 
 class TestHarnessFullSkillPushback:
     """harness-full skill 文档应含偷工 push-back 模式"""

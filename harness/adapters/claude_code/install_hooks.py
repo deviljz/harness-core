@@ -153,6 +153,15 @@ def install_hooks(
             }
         )
 
+    if with_active_tasks and not with_gate:
+        # active_tasks 已能阻止 stop，老的 gate Stop hook 冗余 → 清掉
+        stop = hooks.get("Stop", [])
+        stop[:] = [e for e in stop if not _already_installed([e], HOOK_MARKER)]
+        if stop:
+            hooks["Stop"] = stop
+        else:
+            hooks.pop("Stop", None)
+
     if with_gate:
         stop = hooks.setdefault("Stop", [])
         if not _already_installed(stop, HOOK_MARKER):

@@ -54,7 +54,12 @@ Check whether the code change:
    - **抄近道反模式**：E2E 脚本如果用 `force_*=true` / `skip_*=true` / `mock 业务逻辑参数` 绕过本该走真实路径的分支节点 → 报 "测试用 force_xxx 抄近道绕过 User Flow 步骤 N，未真实覆盖该分支"
    - **断言强度**：测试只检查"API 返回非空 + status_code=200"算弱断言。spec 涉及的 DB 字段（essay_text/feedback_summary/stage 等）测试中必须有 assert，否则报"测试断言过弱，未验证 spec 要求的最终数据状态"
    - 覆盖率门槛：spec User Flow 列出 N 个分支节点，测试覆盖 < N/2 → 报"测试覆盖率不足，missing branches: X, Y, Z"
-9. **ORM / 框架级"自动覆盖"反误报**（防止把声明式实现误报为缺失）：spec 要求"启动跑迁移"/"schema drift 检查加表字段"等持久化类约束时，下结论前**必须 grep 工程**确认是否已通过框架自动覆盖：
+9. **持久化字段真实性 trace（schema-as-truth 反陷阱）**：spec / model 里出现 `image_url` / `file_path` / `*_url` / binary blob 字段时，**字段存在 ≠ 功能就绪**，必须验证真实写盘 + 可访问：
+   - 找到写字段的代码（grep `<field_name> = `）。若赋值是 **占位字符串**（如 `f"[xxx_{{id}}]"`、`"placeholder"`、`f"/dummy/..."`） → 报 "<file:line> 字段 X 只赋占位字符串，binary 从未真实写入存储"
+   - 找上传/接收端：是否 `open(path, 'wb').write(binary)` 或调用对象存储 SDK？若没有 binary 落盘代码 → 报 "<file> 接收 binary 后未 persist，仅做了 OCR/parse 即丢弃"
+   - 找静态服务：spec 涉及 url 字段的，工程是否 `app.mount('/uploads', StaticFiles(...))` 或等价路由？若 mount 不存在或 mount 路径与字段值前缀不匹配 → 报 "静态服务未挂载或路径不一致，URL 字段无法被 client 访问"
+   - 复合字段（JSON 数组）：spec 说"feedback_items 是建议列表"，测试断言**每个 element 是独立短句**（< N 字 + 不含 \n\n），不能只断言数量。整段塞为单条 → 报 "复合字段子结构未验证"
+10. **ORM / 框架级"自动覆盖"反误报**（防止把声明式实现误报为缺失）：spec 要求"启动跑迁移"/"schema drift 检查加表字段"等持久化类约束时，下结论前**必须 grep 工程**确认是否已通过框架自动覆盖：
    - 报"startup 没跑 migration"前：`grep -rn 'create_all\|Base.metadata' app/ src/`，若 startup 有调用 `init_db()` / `Base.metadata.create_all()` 且新 model 已声明 → SQLAlchemy 等 ORM 会自动建新表，迁移已覆盖，**不报**
    - 报"drift 检查没加表字段断言"前：读 `check_schema_drift.py` / 同类脚本，若用 `Base.metadata.tables.values()` / `inspect(engine)` 动态遍历 → 新 model 自动覆盖，**不报**
    - 报"未注册路由"前：grep `include_router` / `app.add_url_rule` / `@app.route`，若新 router 已注册 → **不报**

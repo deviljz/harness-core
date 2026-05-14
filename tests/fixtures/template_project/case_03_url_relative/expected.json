@@ -1,6 +1,6 @@
 {
   "consistent": false,
   "required_keywords": ["相对路径|relative|image_url|https://|baseUrl"],
-  "soft_keywords": ["URL", "scheme", "absolute"],
+  "soft_keywords": ["URL|链接", "scheme|协议|https?://", "absolute|绝对|完整路径|完整\\s*url"],
   "min_issues_count": 1
 }

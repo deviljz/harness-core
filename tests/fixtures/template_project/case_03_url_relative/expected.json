@@ -1,0 +1,6 @@
+{
+  "consistent": false,
+  "required_keywords": ["相对路径|relative|image_url|https://|baseUrl"],
+  "soft_keywords": ["URL", "scheme", "absolute"],
+  "min_issues_count": 1
+}

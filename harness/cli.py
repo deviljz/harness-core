@@ -490,5 +490,14 @@ def reports(count: int):
         console.print(f"{icon} {f.name}  trigger={data.get('trigger', '?')}")
 
 
+# ════════════════════════════════════════════════════════════════════
+# verify
+# ════════════════════════════════════════════════════════════════════
+
+from .verify.cli import verify  # noqa: E402
+
+main.add_command(verify)
+
+
 if __name__ == "__main__":
     main()

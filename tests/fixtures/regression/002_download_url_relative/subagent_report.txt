@@ -1,0 +1,13 @@
+Review Summary
+==============
+
+Reviewed diff for: APK 下载功能
+
+Findings:
+- UpdateService.downloadApk() 已实现
+- 测试 12 case 全过，覆盖率良好
+
+Decision: consistent=true
+
+Note: 所有测试均通过 mock client 运行，无需真实网络请求。
+mock 测试已充分覆盖 downloadApk 逻辑，集成测试可在 CI 阶段补充。

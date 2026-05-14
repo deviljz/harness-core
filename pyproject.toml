@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "harness-core"
-version = "0.3.2"
+version = "0.4.0"
 description = "AI-assisted development harness: plan/execute/review/validate lifecycle"
 authors = [{ name = "jinzhe" }]
 readme = "README.md"
@@ -35,3 +35,4 @@ exclude = ["tests*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+norecursedirs = ["fixtures", ".git", "__pycache__", "*.egg-info", ".tox", "dist", "build"]

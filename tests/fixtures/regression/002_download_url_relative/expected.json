@@ -1,0 +1,6 @@
+{
+  "consistent": false,
+  "required_keywords": ["相对路径|relative|baseUrl|/download"],
+  "soft_keywords": ["mock", "集成测试", "真.*HTTP|integration"],
+  "min_issues_count": 1
+}

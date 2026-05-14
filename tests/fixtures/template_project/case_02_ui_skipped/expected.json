@@ -1,0 +1,6 @@
+{
+  "consistent": false,
+  "required_keywords": ["设置页|SettingsPage|close_button|X.*按钮|close.*button"],
+  "soft_keywords": ["UI", "按钮", "widget"],
+  "min_issues_count": 1
+}

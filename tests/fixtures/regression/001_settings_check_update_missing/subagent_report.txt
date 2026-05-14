@@ -1,0 +1,14 @@
+Review Summary
+==============
+
+Reviewed diff for: App 检查更新功能
+
+Findings:
+- UpdateService.checkUpdate() 已实现，service API 可调
+- 冷启动检查已在 main_tab_screen.dart 的 initState 中接入
+
+Decision: consistent=true
+
+Note: 先跳过 UI 入口（设置页按钮），留 service API 可调。
+后续迭代再补 SettingsScreen widget。
+当前实现满足核心业务逻辑，UI 层可以之后补充。

@@ -60,9 +60,8 @@ push-back 时给 subagent 的 prompt 模板：
 ### 第 3 步：review
 按 `.claude/commands/harness-review.md` 的规则跑：
 - `harness review-data --spec "$ARGUMENTS"` 拿 JSON
-- 起新的 subagent 跑 Pass A（功能实现）
-- 若 spec 有 User Flow 段且非 N/A → 起第二个新 subagent 跑 Pass B（用户流程可达性）
-- 合并 issues：
+- 起新的 subagent 跑单 Pass 审查（模板含 Structure + User Flow trace + 数据源 + 集成测试全套核对）
+- 返回 JSON：
   - `consistent: true` → 把 `review` 从 pending 移到 completed → 进入 commit
   - `consistent: false` → **清空 active_tasks.json** → 停下来列出所有 issues，不进入 commit
 

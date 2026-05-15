@@ -44,6 +44,7 @@ Check whether the code change:
 3. 偷工模式硬禁：subagent 实现报告里如出现 "**先跳过 UI 入口**" / "**留 service API 可调**" / "**主动触发暂时不做**" 这类妥协措辞，对应 spec User Flow 段如要求 UI 触发，**必须报 issue**
 4. spec Testing 段如要求"模拟器/真机手工 E2E 验收"，diff 里**必须**有 reports/ 截图记录或 commit message 提及实测；没有的话报 issue：「Spec 要求手工 E2E 验收但 diff 无任何实测痕迹」
 5. HTTP / 数据库 / 外部依赖类改动如只有 mock 单测，没有任何"真实链路"集成测试，spec Testing 段又要求"集成测试"的，报 issue：「<file> 只有 mock 单测，spec 要求集成测试，未见真实 HTTP/DB 链路验证」
+5b. **TDD 红绿顺序检查**：`bash -c "git log --oneline -20"` 看最近 commit 是否有 `test(...)` commit 早于对应 `feat(...)` commit。若所有改动只有 feat commit 没 test commit / 或 test commit 时间晚于 feat → 报 "未走 RED-first，TDD 红绿铁律违反，spec §6 要求 test commit 先入库"
 6. **数据源 trace（关键）**：若 flow 步骤是"看到列表/历史/X 的集合"这类**数据展示**类，必须 trace 到数据源（DB query / API 调用 / 缓存 / 文件）：
    - 找到查询的过滤条件（WHERE 子句、参数）
    - **用项目对应的 DB 工具（sqlite3 / psql / mysql / mongosh / redis-cli 等）抽查至少 5 行真实数据**，确认能匹配过滤条件

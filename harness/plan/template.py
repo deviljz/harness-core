@@ -58,6 +58,14 @@ DEFAULT_SPEC_TEMPLATE = """# {task_name}
 
 ## 6. Testing（测试策略）
 
+> **TDD 红绿铁律（必须遵守）**：每个测试矩阵条目必须按 RED → GREEN → REFACTOR 严格顺序：
+> 1. **RED**：先写测试，跑一次确认失败（NotImplementedError / AssertionError / 404 等）
+> 2. **GREEN**：写最小实现让测试通过
+> 3. **REFACTOR**：在绿测试保护下重构
+>
+> execute subagent 必须**先 commit 一次测试代码**（独立 commit `test(scope): RED for <feature>` + 跑测试输出贴证据），再 commit 实现（`feat(scope): implement <feature>`）。
+> 实现先写、测试后补 = **违反 TDD**，review 会报偏差。
+>
 > **测试矩阵（必填）**：对照 §2 User Flow 列出每个分支节点对应的测试用例 + 关键断言点。
 > **happy path 端到端覆盖**：必须有一条测试真走完 §2 全部主路径，**禁止用 force_* / skip_* / mock 业务逻辑等参数抄近道绕过分支**。
 

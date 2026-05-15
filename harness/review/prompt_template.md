@@ -63,6 +63,7 @@ Check whether the code change:
     - LLM system prompt 让 AI 输出 ```json``` 块、`[[STAGE:xxx]]` 标记、`<tag>` 等"给后端解析"的协议字段时，**必须验证 reply 返回前 strip 掉这些内容**。grep "reply" 路径上有无 `re.sub(...```json.*```..., "")` / `replace("[[STAGE", "")` 等剥离逻辑；若 LLM 输出有但 reply 没 strip → 报 "<file:line> LLM 内部协议 X 未在返回 reply 前剥离，会泄漏到 chat UI 给用户看"
     - markdown 渲染：chat 气泡纯文本时若 LLM 输出 `**xxx**` / `# xxx`，用户看到 raw markdown → 报 "system_prompt 未禁 markdown，前端纯文本展示会显示原始 markdown 字符"
     - 多阶段对话流程：相邻阶段输出内容**重叠** → 报 "阶段 A 输出了阶段 B 该做的事（如 material 阶段输出提纲列表），User Flow 形态边界没区分"
+    - **UI Smoke Test 缺失检测**（涉及前端 UI 时）：spec 涉及网页 / App UI 渲染时，测试代码里**必须**有自动化 UI smoke test（Playwright 跑前端 + assert 关键文字 / Flutter widget test 用 find.byIcon 验证 UI 元素）。grep `playwright` / `find.byIcon` / `find.text` 等，找不到 → 报 "UI 类 spec 没自动化 smoke test，UI/UX bug（JSON 泄漏到气泡、markdown 不渲染、整段 raw 渲染）review 静态比对抓不到，仅靠手工过目不可靠"
 11. **ORM / 框架级"自动覆盖"反误报**（防止把声明式实现误报为缺失）：spec 要求"启动跑迁移"/"schema drift 检查加表字段"等持久化类约束时，下结论前**必须 grep 工程**确认是否已通过框架自动覆盖：
    - 报"startup 没跑 migration"前：`grep -rn 'create_all\|Base.metadata' app/ src/`，若 startup 有调用 `init_db()` / `Base.metadata.create_all()` 且新 model 已声明 → SQLAlchemy 等 ORM 会自动建新表，迁移已覆盖，**不报**
    - 报"drift 检查没加表字段断言"前：读 `check_schema_drift.py` / 同类脚本，若用 `Base.metadata.tables.values()` / `inspect(engine)` 动态遍历 → 新 model 自动覆盖，**不报**

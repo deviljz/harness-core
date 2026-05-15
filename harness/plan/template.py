@@ -70,6 +70,12 @@ DEFAULT_SPEC_TEMPLATE = """# {task_name}
 - 集成测试：
 - E2E：
 
+> **UI Smoke Test（涉及前端 UI 时必填，不能只靠"手工过目"）**：
+> spec 涉及网页 / App UI 渲染时，必须有自动化 UI smoke test：
+> - 网页：Playwright 启 dev server + 登录 + 导航到关键页 + assert 关键文字存在（如「第 N 轮反馈」「错误提示」「核心按钮 label」）+ 截图存 `reports/<feature>_<tab>_<ts>.png`
+> - App：Flutter widget test 用 `find.byIcon` / `find.text` 验证关键 UI 元素在 widget 树（不依赖真实后端）
+> - **review 静态比对 spec↔diff 抓不到 UI/UX bug**（如内部协议字段泄漏到 chat 气泡、JSON.stringify 渲染原始字串、markdown 不渲染显示 raw `**`）—— 必须靠 UI smoke test 实际跑。
+
 ---
 
 ## 7. Boundaries（边界）

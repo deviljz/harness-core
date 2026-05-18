@@ -45,6 +45,8 @@ Check whether the code change:
 4. spec Testing 段如要求"模拟器/真机手工 E2E 验收"，diff 里**必须**有 reports/ 截图记录或 commit message 提及实测；没有的话报 issue：「Spec 要求手工 E2E 验收但 diff 无任何实测痕迹」
 5. HTTP / 数据库 / 外部依赖类改动如只有 mock 单测，没有任何"真实链路"集成测试，spec Testing 段又要求"集成测试"的，报 issue：「<file> 只有 mock 单测，spec 要求集成测试，未见真实 HTTP/DB 链路验证」
 5b. **TDD 红绿顺序检查**：`bash -c "git log --oneline -20"` 看最近 commit 是否有 `test(...)` commit 早于对应 `feat(...)` commit。若所有改动只有 feat commit 没 test commit / 或 test commit 时间晚于 feat → 报 "未走 RED-first，TDD 红绿铁律违反，spec §6 要求 test commit 先入库"
+5c. **边界值覆盖检查**：grep spec §4 涉及的所有 model nullable 列 + API request 参数。对每个字段在测试代码里 grep `=None` / `=null` / `=""` / `0` / 超长字符串 等边界用例。若关键字段（如 `user.grade`、`writing.topic`）找不到 NULL 边界测试 → 报 "字段 X 是 nullable 但测试没覆盖 NULL 输入路径，典型坑：`None < 1` 类 TypeError 崩 500"
+5d. **Deploy-time smoke test 检查**：若 spec §4 涉及 CDN / 域名分发 / cache 层（关键字 grep：`cloudflare` / `cdn` / `download` / `static` / `Cache-Control`），测试代码里**必须**有 deploy-time script 真访问生产 URL 验证。若 spec 改了下载端点 / 静态资源但只测 TestClient 本地路径 → 报 "spec 涉及 CDN 分发但缺 deploy-time smoke test，本地 TestClient 跳过 CDN 测不出缓存问题"
 6. **数据源 trace（关键）**：若 flow 步骤是"看到列表/历史/X 的集合"这类**数据展示**类，必须 trace 到数据源（DB query / API 调用 / 缓存 / 文件）：
    - 找到查询的过滤条件（WHERE 子句、参数）
    - **用项目对应的 DB 工具（sqlite3 / psql / mysql / mongosh / redis-cli 等）抽查至少 5 行真实数据**，确认能匹配过滤条件

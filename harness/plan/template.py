@@ -58,6 +58,10 @@ DEFAULT_SPEC_TEMPLATE = """# {task_name}
 
 ## 6. Testing（测试策略）
 
+> **边界值覆盖（必须）**：每个用户输入字段、DB nullable 列、外部 API 返回字段，必须有 NULL / 空 / 非法值测试用例。典型坑：`user.grade=NULL` 让 `None < 1` 崩溃 500。在测试矩阵里**每个 nullable 字段单独列一行边界测试**。
+>
+> **Deploy-time Smoke Test（涉及 CDN / 域名 / 缓存时必须）**：spec 改动经过生产 CDN 分发或 cache 层（如 APK 下载、静态资源、API CDN 缓存）时，必须有发版后跑的脚本：真用 curl 下载生产 URL + 校验文件 hash / version code / Cache-Control header 与预期匹配。本地 TestClient 跳过 CDN，测不出缓存问题。
+>
 > **TDD 红绿铁律（必须遵守）**：每个测试矩阵条目必须按 RED → GREEN → REFACTOR 严格顺序：
 > 1. **RED**：先写测试，跑一次确认失败（NotImplementedError / AssertionError / 404 等）
 > 2. **GREEN**：写最小实现让测试通过

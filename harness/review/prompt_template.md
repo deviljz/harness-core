@@ -67,6 +67,13 @@ Check whether the code change:
     - markdown 渲染：chat 气泡纯文本时若 LLM 输出 `**xxx**` / `# xxx`，用户看到 raw markdown → 报 "system_prompt 未禁 markdown，前端纯文本展示会显示原始 markdown 字符"
     - 多阶段对话流程：相邻阶段输出内容**重叠** → 报 "阶段 A 输出了阶段 B 该做的事（如 material 阶段输出提纲列表），User Flow 形态边界没区分"
     - **UI Smoke Test 缺失检测**（涉及前端 UI 时）：spec 涉及网页 / App UI 渲染时，测试代码里**必须**有自动化 UI smoke test（Playwright 跑前端 + assert 关键文字 / Flutter widget test 用 find.byIcon 验证 UI 元素）。grep `playwright` / `find.byIcon` / `find.text` 等，找不到 → 报 "UI 类 spec 没自动化 smoke test，UI/UX bug（JSON 泄漏到气泡、markdown 不渲染、整段 raw 渲染）review 静态比对抓不到，仅靠手工过目不可靠"
+10b. **功能连通性扫描（关键，防 "smoke 全绿但功能 100% 坏"）**：spec 列出"新组件 X + helper Y"时，只看 X 存在 + Y 存在 = **不够**，必须验证 X 真的调用/挂载/绑定到了 Y。典型陷阱：spec 写"新增 chartBattery svg + attachChartHover helper"，subagent 加了 svg 标签，加了 helper 函数，diff review 看到两个 ✅ 判通过，**但 svg 没绑 click handler，用户实测点击没反应**。检查步骤：
+    - 列出 spec 提到的所有 helper / handler / hook / middleware 名字（attachX / onY / withZ / useW）
+    - 对每个 helper，grep 它的**调用点**（`grep -rn "attachChartHover(" src/`），不是定义点
+    - 列出 spec 提到的所有新组件实例（chartBattery / chartGc / chartMemSubTexture / 新表单 / 新路由）
+    - **逐一交叉验证**：每个新组件的源码上下文里，必须能找到对应 helper 的调用。少一个 → 报 "<component> 未调用 <helper>，spec 要求两者连通但代码里独立存在"
+    - **Push vs Pull 模式风险**：若发现 spec 是"每个新组件主动调用 helper"（push 模式，每处手动），主动报 warning "spec 采用 push 模式注册，新增同类组件易漏注册（已发生过 13 chart 漏绑 click 的历史 bug）；建议改 pull 模式：公共 hook 在渲染后扫所有未注册元素自动绑"
+10c. **交互性测试存在性检查**：grep 测试代码里有无 `dispatchEvent` / `fireEvent` / `page.click` / `simulate.click` / `tap(` / `await tester.tap` 等交互触发。若 §6 测试矩阵全是 `querySelectorAll(...).length` / `typeof X` / `textContent` 这类**存在性**断言，没有任何交互断言 → 报 "测试只验存在性不验交互性，'代码没连'类 bug（如 svg 没绑 click handler）抓不到，spec §6 三类测试规则违反"
 11. **ORM / 框架级"自动覆盖"反误报**（防止把声明式实现误报为缺失）：spec 要求"启动跑迁移"/"schema drift 检查加表字段"等持久化类约束时，下结论前**必须 grep 工程**确认是否已通过框架自动覆盖：
    - 报"startup 没跑 migration"前：`grep -rn 'create_all\|Base.metadata' app/ src/`，若 startup 有调用 `init_db()` / `Base.metadata.create_all()` 且新 model 已声明 → SQLAlchemy 等 ORM 会自动建新表，迁移已覆盖，**不报**
    - 报"drift 检查没加表字段断言"前：读 `check_schema_drift.py` / 同类脚本，若用 `Base.metadata.tables.values()` / `inspect(engine)` 动态遍历 → 新 model 自动覆盖，**不报**

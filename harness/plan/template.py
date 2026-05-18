@@ -72,6 +72,15 @@ DEFAULT_SPEC_TEMPLATE = """# {task_name}
 >
 > **测试矩阵（必填）**：对照 §2 User Flow 列出每个分支节点对应的测试用例 + 关键断言点。
 > **happy path 端到端覆盖**：必须有一条测试真走完 §2 全部主路径，**禁止用 force_* / skip_* / mock 业务逻辑等参数抄近道绕过分支**。
+>
+> **三类测试必须各 ≥ 1 条（必须遵守）**：smoke 全绿 ≠ 功能可用。8 个版本攒下来 13 个 chart 都没绑 click handler 但 selector count 测试全过——根因就是只测"存在"不测"连通"。每个 §6 矩阵必须覆盖：
+> 1. **存在性 (existence)**：DOM / 函数 / 类 / 数据结构是否被定义。典型断言：`querySelectorAll('#x').length >= 1` / `typeof renderX === 'function'` / `model.columns has 'x'`。
+> 2. **交互性 (interaction)**：用户/系统触发事件后**状态真的变了**。典型断言：`dispatchEvent(new MouseEvent('click', ...))` 后 `assert SELECTED_FRAME > 0` / `fireEvent.click(btn)` 后 `expect(state).toBe('updated')` / `await page.click('#x'); await expect(page.locator('#y')).toHaveText('...')`。
+> 3. **完整性扫描 (cross-cutting)**：同类元素是否都满足同类约束。典型断言：`for chart in document.querySelectorAll('svg.chart'): assert chart.dataset.hoverAttached === 'true'` / `for route in app.routes: assert route has auth middleware` / grep 全部 `Model.objects.filter(...)` 没有缺索引的。
+>
+> 三类必须各 ≥ 1 条；只有"存在性"的 §6 = 抓不到"代码没连"类 bug，validate 会报 warning。
+
+> **Push vs Pull 模式自检（必须）**：spec 涉及"新增 N 个同类组件"（多个 chart / 多个表单 / 多个路由）时，必须在 §6 加一条 cross-cutting 测试扫描所有同类元素。如果 §6 测试只挨个验证每个组件，没有"扫描全部同类"的断言 → 说明走的是 push 模式（每处手动注册），下次加新组件必漏。**优先考虑公共 hook 兜底（pull 模式）**：渲染完成后扫所有未注册元素自动处理，而不是要求每处主动调用。
 
 | 分支节点（对应 User Flow 第 N 步） | 测试用例 | 关键断言 |
 |---|---|---|

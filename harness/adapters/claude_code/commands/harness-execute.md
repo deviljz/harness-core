@@ -30,3 +30,11 @@ argument-hint: <spec-path>
   6. **独立 commit**：`feat(scope): implement <feature>`
   7. 若需要重构，在测试全绿下做（REFACTOR），独立 commit `refactor:`
 - subagent 报告若缺 RED 失败证据 = 跳了 RED step，主 AI 必须 push-back 重做
+- **Cross-cutting 历史风险扫描（必须）**：subagent 实现新组件前，必须先扫描工程历史是否有"加同类组件就该做 X"的成文规则：
+  1. 若本次新增 N 个同类组件（chart / table / tab / form / route），grep 工程里已有的同类组件代码，看它们是怎么处理 click/hover/submit/auth 等共性约束的
+  2. 在本次新组件代码里照搬同样模式，**禁止只加 DOM 不绑 handler / 只声明 model 不注册 admin / 只加 route 不挂 middleware**
+  3. 遇到 push 模式（每处手动绑、每处手动注册）且新增组件 ≥ 3 个时，**主动询问主 AI 是否改 pull 模式**（公共 hook / decorator / mixin 兜底）。理由：push 模式下次加新组件必漏，已经发生过 13 chart 漏绑 click handler 8 个版本没抓到的事故
+- **连通性自检（必须）**：subagent 完成实现 + 测试 GREEN 后，提交前必须自查：
+  1. spec 提到的每个 helper / handler / hook，是否被 spec 列出的每个新组件**实际调用**？grep helper 名字看调用点（不是定义点）
+  2. 若 spec 写"X + Y helper"但 X 的代码上下文里找不到 `Y(` 调用 → 视为"代码没连"，必须补上调用再 commit
+  3. 报告里必须**显式列出**："新组件列表 [A, B, C] × helper [Y]，连通性已逐一验证，调用点：A.js:42 / B.js:78 / C.js:103"

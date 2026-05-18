@@ -90,6 +90,41 @@ def validate_spec(spec_path: Path) -> list[ValidationIssue]:
             ValidationIssue("error", "spec appears empty or minimal; please fill content")
         )
 
+    # 5. §6 Testing 必须含交互性测试关键词，否则 warn
+    # 防止 "selector count / typeof 只测存在性" → smoke 全绿但功能 100% 坏
+    testing_match = re.search(
+        r"^##\s+(?:\d+\.\s+)?Testing(.*?)(?=^##\s|\Z)",
+        content,
+        re.MULTILINE | re.DOTALL,
+    )
+    if testing_match:
+        testing_body = testing_match.group(1)
+        interaction_markers = [
+            "dispatchEvent",
+            "fireEvent",
+            "page.click",
+            "page.tap",
+            "simulate.click",
+            "tester.tap",
+            "find.byIcon",
+            "find.byTooltip",
+            "userEvent.",
+            "await tester",
+            "MouseEvent",
+            "TouchEvent",
+            "KeyboardEvent",
+            "click(",
+        ]
+        if not any(m in testing_body for m in interaction_markers):
+            issues.append(
+                ValidationIssue(
+                    "warning",
+                    "Testing 段未发现交互性测试关键词（dispatchEvent / page.click / "
+                    "tester.tap / fireEvent / find.byIcon 等）。spec §6 三类测试规则要求"
+                    "至少 1 条交互性测试，否则 'selector 存在但 handler 没绑' 类 bug 抓不到。",
+                )
+            )
+
     return issues
 
 

@@ -60,6 +60,15 @@ DEFAULT_SPEC_TEMPLATE = """# {task_name}
 
 > **边界值覆盖（必须）**：每个用户输入字段、DB nullable 列、外部 API 返回字段，必须有 NULL / 空 / 非法值测试用例。典型坑：`user.grade=NULL` 让 `None < 1` 崩溃 500。在测试矩阵里**每个 nullable 字段单独列一行边界测试**。
 >
+> **路径参数语义边界（涉及 URL path 参数时必须）**：authz 中间件 / route handler 用正则提取 path 参数时，必须有"**值合法但语义不同**"的反向测试。典型坑：`/(\d+)/` 通配匹配 `/api/parent/wish/123` 里的 123 当 user_id（实际是 wish_id），导致家长审批永远 403。测试矩阵每个含数字的 path（user_id / wish_id / task_id / item_id 等）**都要单独列一行**验证提取语义正确。
+>
+> **真实文件 fixture（涉及文件上传/媒体处理时必须）**：测试 fixture 不能只有 KB 级小图，必须含**真实大文件样本**：
+> - iOS HEIC 原图（5-15MB）
+> - Android HDR 原图（8-20MB）
+> - 视频文件（30-80MB，时长 30s+）
+> - 长 PDF / 多页文档
+> 用小图测过的上传链路在真实手机上常发 413 / 内存溢出 / 超时，**fixture 必须有代表性**才能复现。
+>
 > **Deploy-time Smoke Test（涉及 CDN / 域名 / 缓存时必须）**：spec 改动经过生产 CDN 分发或 cache 层（如 APK 下载、静态资源、API CDN 缓存）时，必须有发版后跑的脚本：真用 curl 下载生产 URL + 校验文件 hash / version code / Cache-Control header 与预期匹配。本地 TestClient 跳过 CDN，测不出缓存问题。
 >
 > **TDD 红绿铁律（必须遵守）**：每个测试矩阵条目必须按 RED → GREEN → REFACTOR 严格顺序：
@@ -73,12 +82,13 @@ DEFAULT_SPEC_TEMPLATE = """# {task_name}
 > **测试矩阵（必填）**：对照 §2 User Flow 列出每个分支节点对应的测试用例 + 关键断言点。
 > **happy path 端到端覆盖**：必须有一条测试真走完 §2 全部主路径，**禁止用 force_* / skip_* / mock 业务逻辑等参数抄近道绕过分支**。
 >
-> **三类测试必须各 ≥ 1 条（必须遵守）**：smoke 全绿 ≠ 功能可用。8 个版本攒下来 13 个 chart 都没绑 click handler 但 selector count 测试全过——根因就是只测"存在"不测"连通"。每个 §6 矩阵必须覆盖：
+> **四类测试必须各 ≥ 1 条（必须遵守）**：smoke 全绿 ≠ 功能可用。8 个版本攒下来 13 个 chart 都没绑 click handler 但 selector count 测试全过——根因就是只测"存在"不测"连通"。每个 §6 矩阵必须覆盖：
 > 1. **存在性 (existence)**：DOM / 函数 / 类 / 数据结构是否被定义。典型断言：`querySelectorAll('#x').length >= 1` / `typeof renderX === 'function'` / `model.columns has 'x'`。
 > 2. **交互性 (interaction)**：用户/系统触发事件后**状态真的变了**。典型断言：`dispatchEvent(new MouseEvent('click', ...))` 后 `assert SELECTED_FRAME > 0` / `fireEvent.click(btn)` 后 `expect(state).toBe('updated')` / `await page.click('#x'); await expect(page.locator('#y')).toHaveText('...')`。
 > 3. **完整性扫描 (cross-cutting)**：同类元素是否都满足同类约束。典型断言：`for chart in document.querySelectorAll('svg.chart'): assert chart.dataset.hoverAttached === 'true'` / `for route in app.routes: assert route has auth middleware` / grep 全部 `Model.objects.filter(...)` 没有缺索引的。
+> 4. **时序竞态 (race condition)**：异步操作期间 UI 状态必须断言。典型坑：用户在 9 张图串行上传 10-30s 期间反复点"提交"，导致重复 draft / race 提交。每个含异步操作的按钮都要测：「触发异步操作 → 立即断言按钮 disabled / loading → 异步完成后断言恢复」。Flutter 用 `await tester.tap(...); expect(find.byType(LoadingIndicator), findsOneWidget); await tester.pump(Duration(seconds: 1)); expect(find.text('Submit').evaluate().first.widget.onPressed, isNull)`；Web 用 Playwright `await page.click(btn); await expect(page.locator(btn)).toBeDisabled()`。
 >
-> 三类必须各 ≥ 1 条；只有"存在性"的 §6 = 抓不到"代码没连"类 bug，validate 会报 warning。
+> 四类必须各 ≥ 1 条；只有"存在性"的 §6 = 抓不到"代码没连"/"按钮 race"类 bug，validate 会报 warning。
 
 > **Push vs Pull 模式自检（必须）**：spec 涉及"新增 N 个同类组件"（多个 chart / 多个表单 / 多个路由）时，必须在 §6 加一条 cross-cutting 测试扫描所有同类元素。如果 §6 测试只挨个验证每个组件，没有"扫描全部同类"的断言 → 说明走的是 push 模式（每处手动注册），下次加新组件必漏。**优先考虑公共 hook 兜底（pull 模式）**：渲染完成后扫所有未注册元素自动处理，而不是要求每处主动调用。
 

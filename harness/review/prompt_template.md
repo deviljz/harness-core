@@ -74,6 +74,15 @@ Check whether the code change:
     - **逐一交叉验证**：每个新组件的源码上下文里，必须能找到对应 helper 的调用。少一个 → 报 "<component> 未调用 <helper>，spec 要求两者连通但代码里独立存在"
     - **Push vs Pull 模式风险**：若发现 spec 是"每个新组件主动调用 helper"（push 模式，每处手动），主动报 warning "spec 采用 push 模式注册，新增同类组件易漏注册（已发生过 13 chart 漏绑 click 的历史 bug）；建议改 pull 模式：公共 hook 在渲染后扫所有未注册元素自动绑"
 10c. **交互性测试存在性检查**：grep 测试代码里有无 `dispatchEvent` / `fireEvent` / `page.click` / `simulate.click` / `tap(` / `await tester.tap` 等交互触发。若 §6 测试矩阵全是 `querySelectorAll(...).length` / `typeof X` / `textContent` 这类**存在性**断言，没有任何交互断言 → 报 "测试只验存在性不验交互性，'代码没连'类 bug（如 svg 没绑 click handler）抓不到，spec §6 三类测试规则违反"
+10d. **路径参数语义边界检查**：若 diff 涉及 authz 中间件 / route handler 提取 URL 路径参数（关键字 grep：`re.match.*\d+` / `re.search.*\\d` / `pathParameters` / `path_params`），测试代码必须含"**path 含数字但语义不同**"的反向用例。如 `/api/user/{{uid}}` vs `/api/parent/wish/{{wish_id}}` —— 后者数字不是 user_id，必须有断言验证中间件**不**把 wish_id 误当 user_id。若没找到反向测试 → 报 "<file:line> path 正则通配匹配但缺少'值合法但语义不同'反向测试，典型坑：通配 \\d+ 把 wish_id 误当 user_id 致 403"
+10e. **真实文件 fixture 检查**：若 spec / diff 涉及文件上传 / 媒体处理（关键字 grep：`upload` / `MAX_IMAGE_SIZE` / `multipart` / `image_url` / `media`），测试 fixture 必须含**真实大文件样本**：检查 `tests/fixtures/` 或 `tests/images/` 下是否有 ≥ 1MB 的图片、≥ 10MB 的视频、HEIC / HDR 样本。若只有 KB 级小图 → 报 "<file> 上传测试 fixture 全是 KB 级小图，无 HEIC / HDR / 大视频代表性样本，真实手机原图（5-15MB）在生产会触发 413 / 内存溢出但测试抓不到"
+10f. **时序竞态测试检查**：若 spec / diff 涉及异步操作 + UI 按钮（关键字 grep：`await.*upload` / `setState.*loading` / `_busy` / `_uploading` / `disabled.*loading`），测试代码必须含"异步进行中按钮被点 → 断言被 disabled"用例。grep 测试有无 `expect.*toBeDisabled` / `expect.*isNull.*onPressed` / `LoadingIndicator.*findsOne` / 类似断言。若没找到 → 报 "异步操作期间 UI 按钮状态无测试覆盖，typical bug：用户在 9 张图上传 10-30s 期间反复点提交导致 race / 重复 draft 创建"
+10g. **鉴权契约扫描（后端加 verify_token 必须前端同步）**：若 diff 给路由新增了 `verify_token` / `Depends(get_current_user)` / `@require_auth` 等鉴权依赖，必须验证：
+    - grep 前端 axios / fetch / api service 调用方，确认对应端点路径**都能带上 Authorization header**
+    - 若有的 api service 用全局 interceptor（如 axios.interceptors.request.use）→ ✅ pull 模式，新加端点自动覆盖
+    - 若每个 api service 单独手动加 header（push 模式）→ 报 "<file> 后端加 verify_token 但前端 axios 调用方未在所有端点带 token（push 模式），新加端点立刻 401"
+    - 推荐 pull 模式优于 push 模式（已有 axios.interceptors 兜底）
+10h. **修复完整性扫描（race / 边界类修复必须扫同模块同类入口）**：若 commit message / spec 提到「修 race」「按钮 disable」「防重复提交」「按钮 loading」类修复，必须验证修复**覆盖该模块所有同类异步入口**，不能只修一处。grep 同模块（如 `screens/*_tab.dart` / `pages/*Tab.jsx`）所有 `async` / `await` / `Future<` 调用点，对应的按钮是否都有 disable 状态。漏一个 → 报 "<file:line> 该模块还有 N 处异步入口未做按钮 disable 保护，与本次修复同类场景同 bug，典型坑：上次修了 add-media race，这次又踩到 first-create-draft race（同模块两条异步路径）"
 11. **ORM / 框架级"自动覆盖"反误报**（防止把声明式实现误报为缺失）：spec 要求"启动跑迁移"/"schema drift 检查加表字段"等持久化类约束时，下结论前**必须 grep 工程**确认是否已通过框架自动覆盖：
    - 报"startup 没跑 migration"前：`grep -rn 'create_all\|Base.metadata' app/ src/`，若 startup 有调用 `init_db()` / `Base.metadata.create_all()` 且新 model 已声明 → SQLAlchemy 等 ORM 会自动建新表，迁移已覆盖，**不报**
    - 报"drift 检查没加表字段断言"前：读 `check_schema_drift.py` / 同类脚本，若用 `Base.metadata.tables.values()` / `inspect(engine)` 动态遍历 → 新 model 自动覆盖，**不报**

@@ -38,3 +38,8 @@ argument-hint: <spec-path>
   1. spec 提到的每个 helper / handler / hook，是否被 spec 列出的每个新组件**实际调用**？grep helper 名字看调用点（不是定义点）
   2. 若 spec 写"X + Y helper"但 X 的代码上下文里找不到 `Y(` 调用 → 视为"代码没连"，必须补上调用再 commit
   3. 报告里必须**显式列出**："新组件列表 [A, B, C] × helper [Y]，连通性已逐一验证，调用点：A.js:42 / B.js:78 / C.js:103"
+- **修复完整性扫描（race / 鉴权 / 按钮 disable 类修复必须扫同模块同类入口）**：subagent 修 race condition / button disable / 鉴权类 bug 时，**禁止只修被现场触发的那一处**，必须扫描同模块所有同类入口：
+  1. 修 race 时：grep 同模块（如 `screens/*.dart` / `pages/*.jsx`）所有 `async` / `await` / `Future<` 异步入口，逐个验证按钮 disable 是否一致
+  2. 修后端鉴权（加 verify_token）时：grep 前端 api service 调用方，验证对应端点都能拿到 token（推荐 axios.interceptors / fetch wrapper 等 pull 模式而非每处手动加）
+  3. 修 URL path 参数提取 bug 时：grep 工程所有 `/api/*` 路由，找出含数字的 path，逐个验证语义对应正确（user_id / wish_id / task_id 不能混）
+  4. 报告中必须**显式列出"修了 N 处 + 扫描了 M 处同类入口、其中 P 处也补了同类保护"**。仅修 1 处而不报告同模块扫描结果 = 修复不彻底，已发生过 d5e5000 修 add-media race 但漏 first-create-draft race 的事故

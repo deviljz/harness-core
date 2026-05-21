@@ -125,6 +125,37 @@ def validate_spec(spec_path: Path) -> list[ValidationIssue]:
                 )
             )
 
+        # 6. 若涉及异步操作 + UI，检查是否有"时序竞态"测试
+        # 关键词识别：spec 全文出现 upload / async / await / loading 同时含 button / 按钮 / 提交
+        full_lower = content.lower()
+        async_markers = ["upload", "async", "await ", "loading", "异步", "上传", "submit"]
+        ui_markers = ["button", "按钮", "提交", "点击", "click", "tap"]
+        has_async = any(m in full_lower for m in async_markers)
+        has_ui = any(m in full_lower for m in ui_markers)
+        if has_async and has_ui:
+            race_markers = [
+                "toBeDisabled",
+                "isDisabled",
+                "toHaveAttribute('disabled'",
+                "isNull.*onPressed",
+                "LoadingIndicator",
+                "竞态",
+                "race",
+                "disable.*loading",
+                "_busy",
+                "_uploading",
+            ]
+            if not any(m in testing_body for m in race_markers):
+                issues.append(
+                    ValidationIssue(
+                        "warning",
+                        "Testing 段涉及异步操作 + UI 按钮但未发现时序竞态测试关键词"
+                        "（toBeDisabled / LoadingIndicator / _busy 等）。"
+                        "spec §6 四类测试要求至少 1 条时序竞态测试，否则用户在 "
+                        "9 图上传 10-30s 期间反复点提交导致 race / 重复 draft 类 bug 抓不到。",
+                    )
+                )
+
     return issues
 
 

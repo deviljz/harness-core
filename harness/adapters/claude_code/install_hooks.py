@@ -181,6 +181,9 @@ def install_hooks(
     # 3) 安装 slash commands 到 .claude/commands/
     _install_commands(claude_dir)
 
+    # 4) 安装 skills 到 .claude/skills/
+    _install_skills(claude_dir)
+
     return settings_path
 
 
@@ -195,6 +198,27 @@ def _install_commands(claude_dir: Path) -> list[Path]:
         dst = dst_dir / src.name
         shutil.copyfile(src, dst)
         installed.append(dst)
+    return installed
+
+
+def _install_skills(claude_dir: Path) -> list[Path]:
+    """复制 harness/skills/* 到项目 .claude/skills/，整目录拷贝
+    （每个 skill 是一个子目录含 SKILL.md）。已存在则覆盖（保持最新）。"""
+    # harness/skills 在 harness 包根目录下
+    skills_src = Path(__file__).resolve().parent.parent.parent / "skills"
+    if not skills_src.exists():
+        return []
+    dst_dir = claude_dir / "skills"
+    dst_dir.mkdir(exist_ok=True)
+    installed: list[Path] = []
+    for skill_dir in skills_src.iterdir():
+        if not skill_dir.is_dir() or skill_dir.name.startswith("__"):
+            continue
+        dst_skill = dst_dir / skill_dir.name
+        if dst_skill.exists():
+            shutil.rmtree(dst_skill)
+        shutil.copytree(skill_dir, dst_skill)
+        installed.append(dst_skill)
     return installed
 
 

@@ -29,11 +29,20 @@ class FallbackModule(LanguageModule):
         target_config: dict,
         project_root: Path,
     ) -> TestRunResult:
-        """从 checks 里找第一个带 cmd 的 check 跑"""
+        """从 checks 里找第一个带 cmd 的 check 跑。
+
+        支持在 cmd 里用 `{test_files}` placeholder 引用增量测试列表（空格分隔）。
+        若 cmd 不含 placeholder，按以前行为跑全量。
+        例： cmd: "pytest {test_files}" + test_files=[a.py, b.py] → "pytest a.py b.py"
+        """
         checks = target_config.get("checks", {})
         for _check_name, check_cfg in checks.items():
             if isinstance(check_cfg, dict) and "cmd" in check_cfg:
                 cmd = check_cfg["cmd"]
+                if "{test_files}" in cmd:
+                    # 增量：把 test_files 列表展开成空格分隔字符串
+                    files_str = " ".join(f'"{f}"' if " " in f else f for f in test_files)
+                    cmd = cmd.replace("{test_files}", files_str)
                 cwd = check_cfg.get("cwd", str(project_root))
                 timeout = check_cfg.get("timeout", 600)
                 return run_command(cmd, cwd, timeout=timeout)

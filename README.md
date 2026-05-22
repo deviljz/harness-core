@@ -2,7 +2,17 @@
 
 AI 工程化 Harness 框架。实现 4 层闭环：方案 → 执行 → 审查 → 验证。
 
-## 安装（开发模式）
+> **AI 代理首次接入新工程：直接读 [AGENTS.md](./AGENTS.md)**（不用人工告诉你怎么装）。
+
+## 安装
+
+远程安装（推荐）：
+
+```bash
+pip install git+https://github.com/deviljz/harness-core.git
+```
+
+开发模式（本地改 harness-core 源码时用）：
 
 ```bash
 cd ~/workspace/harness-core

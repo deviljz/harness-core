@@ -36,6 +36,7 @@ EXT_TO_LANG: dict[str, str] = {
     ".java": "java",
     ".kt": "kotlin",
     ".swift": "swift",
+    ".cs": "csharp",  # 包括 Unity 工程，规则在 config.yaml anti_patterns.csharp 下沉淀
 }
 
 

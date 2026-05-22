@@ -89,6 +89,33 @@ harness check
 
 如果 skill 触发并要求填 8 段 spec → 接入成功。
 
+## ⚠️ fallback 模式退化清单（非 python / dart 工程必读）
+
+harness-core 完整能力只在 `language: python` 和 `language: dart` 模块下生效（dart 模块当前为占位空目录，Python 是完整范例）。其他语言（C# / Unity / Unreal C++ / Go / Rust / Swift / Kotlin / Java 等）走 `language: fallback`，**核心能力大量退化**：
+
+| 能力 | python 模块 | fallback 模式 | 影响 |
+|---|---|---|---|
+| `find_related_tests` | grep 反向引用 + 命名约定 | **返回空**（不知道改 X 该跑哪个测试）| `harness check --on-edit` 触发全量跑，慢工程会卡死 |
+| `run_tests(test_files)` | 增量跑 `pytest <files>` | 跑 `target.checks.*.cmd` 但**不传 test_files** | 没有"只跑相关测试"，每次全量 |
+| `parse_results` | 解析 pytest stdout / junit xml | 只看 `exit_code`（0/非 0）| 报告里**看不到哪个具体测试挂了** |
+| `deep_check` AST 扫描 | bare except / 可变默认参数 / forbid_tautology 等 | **返回空** | 没有 AST 级反模式检测 |
+| `anti_patterns` 内置规则 | python 组若干 | **空（除非自己写）** | 需要项目自己在 config.yaml 加 anti_patterns.<lang> 组 |
+
+**实际效果**：fallback 模式下 `/harness-check` 等价于「跑一个 shell 命令看 exit_code」。能用的只剩 `/harness-plan`（写 spec）和 `/harness-review`（独立 subagent 审查 diff + spec），这两条是语言无关的。
+
+### 对 Unity / 长编译型工程的额外约束
+
+- **PostToolUse hook 自动 check 会爆炸**：Unity batchmode 单次 30-60s，每次 Edit/Write 都触发 → 单天 200 次编辑 = 200 分钟 batchmode。**接入前必须先关 PostToolUse hook 或改成「标记+延迟批跑」**
+- **prefab / scene / blueprint 这类二进制资源 review 暂不支持**：harness review 模板假设 diff 是文本代码，对 YAML fileID diff 完全无法语义化。短期建议 `review.ignore_diff_patterns` 白名单忽略 `**/*.prefab` `**/*.unity` `**/*.meta` 等，**只 review 代码文件**
+- **运行时数据合理性问题不在 harness 覆盖范围**：harness 是静态测试 + diff review 工具，「数据数组全是同一个值 / 跨工具单位不一致」这类运行时 bug 需要项目自建 sanity 工具
+
+### 推荐用法（C# / Unity / Unreal 等 non-python-dart 工程）
+
+1. 装 harness 但**只用** `/harness-plan` 和 `/harness-review`，**跳过** `/harness-check` / `/harness-full`
+2. `PostToolUse` hook 关闭（`.claude/settings.json` 删 harness 相关 hook）
+3. 在 `.harness/config.yaml.anti_patterns.<lang>` 沉淀项目特有的反模式正则（参考 [docs/contributing-anti-patterns.md](./docs/contributing-anti-patterns.md)）
+4. 真正想要全套能力 → 给 harness-core 贡献 `harness/languages/<lang>/` 模块（参考 python 模块结构）
+
 ## 不要做的事
 
 - **不要硬编码 API key** 到 config.yaml；用 `${ENV_VAR}` 引用环境变量

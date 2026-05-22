@@ -147,11 +147,17 @@ gate:
 #       pattern: '^\\s*catch\\s*\\([^)]*\\)\\s*\\{{\\s*\\}}\\s*$'
 #       msg: "禁止裸 catch 空块，会吞掉所有异常"
 #       severity: error
-#     - name: editor_api_no_ifdef_guard
-#       pattern: 'using UnityEditor(?!\\s+namespace|\\.[A-Z])'
-#       msg: "业务脚本 using UnityEditor 必须配 #if UNITY_EDITOR 包裹，否则 IL2CPP build 失败"
-#       severity: error
-#       case: "Unity 工程通用坑"
+#     # 注意：纯正则识别不了 #if 上下文，下面这条只能抓 "import 了 UnityEditor"，
+#     # 抓不到 "运行时代码真的调了 UnityEditor.X"。
+#     # 真要查 IL2CPP build 风险需要 C# parser（Roslyn），不是正则能搞定的。
+#     # 当前规则只能当作 "代码卫生提醒"（unused using），所以 severity = warn。
+#     - name: editor_using_in_runtime_file
+#       pattern: '^using UnityEditor'
+#       msg: "运行时脚本里有 'using UnityEditor'——如果是 unused import 建议清理；如果有真实用法必须配 #if UNITY_EDITOR"
+#       severity: warn
+#       include: ["Assets/Scripts/**/*.cs"]
+#       exclude: ["Assets/Scripts/Editor/**", "**/Tests/**"]
+#       case: "Unity unused using 卫生（IL2CPP 不强制，但 unused 是噪音）"
 #   all:
 #     - name: api_key_leak
 #       pattern: '(AIza[0-9A-Za-z_-]{{35}}|sk-[a-zA-Z0-9]{{20,}}|ghp_[a-zA-Z0-9]{{36}})'

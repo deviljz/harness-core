@@ -125,7 +125,8 @@ gate:
   max_age_seconds: 300
 
 # 反模式正则检查（跨语言静态扫描）。取消注释开启。
-# 顶层 key = 语言名（dart/python/typescript/javascript/go/rust/java/kotlin/swift），"all" 对所有扩展名生效。
+# 顶层 key = 语言名（dart/python/typescript/javascript/go/rust/java/kotlin/swift/csharp），
+# "all" 对所有扩展名生效。详见 docs/contributing-anti-patterns.md。
 # anti_patterns:
 #   dart:
 #     - name: self_recursive_getter
@@ -141,6 +142,16 @@ gate:
 #       pattern: 'def \\w+\\([^)]*=\\s*(\\[\\]|\\{{\\}})\\s*[,)]'
 #       msg: "可变默认参数跨调用共享状态，用 None"
 #       severity: error
+#   csharp:                              # 含 Unity 工程，.cs 文件
+#     - name: empty_catch
+#       pattern: '^\\s*catch\\s*\\([^)]*\\)\\s*\\{{\\s*\\}}\\s*$'
+#       msg: "禁止裸 catch 空块，会吞掉所有异常"
+#       severity: error
+#     - name: editor_api_no_ifdef_guard
+#       pattern: 'using UnityEditor(?!\\s+namespace|\\.[A-Z])'
+#       msg: "业务脚本 using UnityEditor 必须配 #if UNITY_EDITOR 包裹，否则 IL2CPP build 失败"
+#       severity: error
+#       case: "Unity 工程通用坑"
 #   all:
 #     - name: api_key_leak
 #       pattern: '(AIza[0-9A-Za-z_-]{{35}}|sk-[a-zA-Z0-9]{{20,}}|ghp_[a-zA-Z0-9]{{36}})'

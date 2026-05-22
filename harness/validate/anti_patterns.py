@@ -184,6 +184,9 @@ def run_anti_patterns(
     else:
         status = "pass"
 
+    # 把 error 排在 sample 最前，避免出现 "msg 报 6 error 但 sample 全是 warn"
+    # 的视觉错觉（之前会让用户怀疑统计 bug，实际只是 sample 截断到 50）
+    sample_findings = errors + warns
     return CheckResult(
         check_name="anti_patterns",
         target="global",
@@ -198,8 +201,10 @@ def run_anti_patterns(
                     "rule": f.rule,
                     "msg": f.msg,
                 }
-                for f in findings[:50]
+                for f in sample_findings[:50]
             ],
             "total": len(findings),
+            "n_errors": len(errors),
+            "n_warns": len(warns),
         },
     )

@@ -1,0 +1,10 @@
+{
+  "consistent": false,
+  "required_keywords": ["RT|RenderTexture|裁切|crop|Blit|全屏|backbuffer"],
+  "soft_keywords": [
+    "Screen\\.width|Screen\\.height|尺寸",
+    "CaptureScreenshotIntoRenderTexture",
+    "fullRt|全屏\\s*RT|fullsize"
+  ],
+  "min_issues_count": 1
+}

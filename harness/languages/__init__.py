@@ -45,5 +45,14 @@ def _register_dart():
         pass
 
 
+def _register_unity_csharp():
+    try:
+        from .unity_csharp import UnityCSharpModule
+        register_language("unity_csharp", UnityCSharpModule)
+    except ImportError:
+        pass
+
+
 _register_python()
 _register_dart()
+_register_unity_csharp()

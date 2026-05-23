@@ -1,0 +1,20 @@
+{
+  "charts_selector": "svg.chart",
+  "non_chart_ids": [],
+  "palette": {
+    "allowed_hex": ["#79c0ff", "#7ee787", "#ffa657", "#d2a8ff", "#ffd479", "#ec4899", "#888"],
+    "semantic_reserved": {}
+  },
+  "assertions": {
+    "A1-1": {
+      "enabled": true,
+      "forbidden_keywords": ["frameMs"],
+      "chart_exceptions": {}
+    },
+    "A1-2": { "enabled": true },
+    "A2-1": { "enabled": true, "ignore_grayscale": true },
+    "A2-2": { "enabled": true, "min_hue_diff_deg": 30.0 },
+    "A3-1": { "enabled": true, "expected_align": "left" },
+    "A4-1": { "enabled": true, "units": ["MB", "ms", "KB", "个", "%"] }
+  }
+}

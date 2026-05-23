@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh"><head><meta charset="utf-8"><title>Mock Report — visual audit fixture</title>
+<style>
+body { background: #1e1e1e; color: #ddd; font-family: sans-serif; }
+table { border-collapse: collapse; }
+td.num { text-align: left; }
+#tooltip { position: fixed; background: #000; color: #fff; padding: 4px; display: none; }
+</style>
+</head>
+<body>
+<!-- 故意触发 A1-1 失败：chartMemBad 的 hover 会把 frameMs= 串进来 -->
+<svg id="chartMemGood" class="chart" viewBox="0 0 1200 140" data-tooltip-text="第 100 帧 GfxUsed = 305.8 MB">
+  <path d="M0,0 L100,50" stroke="#79c0ff" fill="none"/>
+</svg>
+<svg id="chartMemBad" class="chart" viewBox="0 0 1200 140" data-tooltip-text="第 100 帧 frameMs = 33.05 MemUsed = 800.0 MB">
+  <path d="M0,0 L100,50" stroke="#79c0ff" fill="none"/>
+  <path d="M0,10 L100,40" stroke="#5aaad7" fill="none"/>
+</svg>
+<!-- A2-2 触发：chartMemBad 两线蓝色相近 #79c0ff vs #5aaad7 -->
+
+<!-- A4-1 触发：表格"贴图 735" 没标单位（实际是 Count，被误读 MB）-->
+<table>
+  <thead>
+    <tr><th>资源类型</th><th>贴图</th><th>网格</th><th>内存 (MB)</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>峰值</td><td class="num">735</td><td class="num">200</td><td class="num">305.8</td></tr>
+  </tbody>
+</table>
+
+<!-- A2-1 触发：用了非调色板色 #abcdef -->
+<div style="color: #abcdef">非调色板色文本（应被 A2-1 catch）</div>
+
+<div id="tooltip"></div>
+
+<script>
+// Mock hover: 用 data-tooltip-text 模拟真实 hover 行为
+document.querySelectorAll('svg.chart').forEach(svg => {
+  svg.addEventListener('mousemove', () => {
+    const t = document.getElementById('tooltip');
+    t.innerText = svg.getAttribute('data-tooltip-text') || '';
+    t.style.display = 'block';
+  });
+});
+</script>
+</body></html>

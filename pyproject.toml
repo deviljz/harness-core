@@ -32,6 +32,11 @@ exclude = ["tests*"]
 [tool.setuptools.package-data]
 "harness.review" = ["prompt_template.md"]
 "harness.adapters.claude_code" = ["commands/*.md"]
+# skill 资源（SKILL.md 等）：必须显式声明，否则 wheel 不打包，
+# pip install 后 .claude/skills/<name>/ 缺 SKILL.md，
+# Claude Code 识别不到 skill（识别靠 SKILL.md frontmatter），
+# 导致 /harness-baseline 等 slash command 在新会话不可见
+"harness.skills" = ["**/SKILL.md", "**/*.json", "**/*.yaml", "**/*.yml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

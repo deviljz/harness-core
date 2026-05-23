@@ -76,12 +76,12 @@ def test_gap_diff_missing():
 
 
 def test_gap_diff_fuzzy_partial():
+    # v0.1 reviewer 调整：用默认 0.75 阈值，避免不同类别共享前缀误判 partial
     b = _mk_result(["GPU 渲染分析", "GPU 带宽分析"])
-    t = _mk_result(["GPU 渲染"])  # 缩写 → fuzzy
-    # 默认 0.75 阈值：渲染分析 / 渲染 sim≈0.83 → partial；带宽分析 / 渲染 sim≈0.67 → missing
-    gap = gap_diff(b, t)
+    t = _mk_result(["GPU 渲染分析x"])  # 仅小差异 (后缀 x)，应 partial
+    gap = gap_diff(b, t)  # 默认 0.75
     assert gap.counts["partial"] >= 1
-    # GPU 带宽分析 不会被错配到 GPU 渲染（避免不同类别共享前缀就 partial 的语义错误）
+    # GPU 带宽分析 与 GPU 渲染分析x 字符差异大，应判 missing
     assert any(m.baseline_label == "GPU 带宽分析" for m in gap.missing)
 
 

@@ -1,13 +1,17 @@
-"""harness baseline CLI: harness baseline scan ..."""
+"""harness baseline CLI: harness baseline scan ...
+
+v0.2: --alias-map / --top-level-only / --adaptive
+"""
 
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
 from .scanner import scan_baseline, scan_target
-from .diff import gap_diff
+from .diff import gap_diff, DEFAULT_FUZZY_THRESHOLD
 from .writer import write_spec_gap_section
 
 
@@ -29,8 +33,23 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument(
         "--fuzzy-threshold",
         type=float,
-        default=0.6,
-        help="Fuzzy match similarity threshold for partial match (0.0-1.0)",
+        default=DEFAULT_FUZZY_THRESHOLD,
+        help=f"Fuzzy partial match threshold 0.0-1.0 (default {DEFAULT_FUZZY_THRESHOLD})",
+    )
+    scan.add_argument(
+        "--alias-map",
+        default=None,
+        help="JSON file: {baseline_label: [target_alias, ...]} 语义别名映射，优先匹配",
+    )
+    scan.add_argument(
+        "--top-level-only",
+        action="store_true",
+        help="v0.2: 只抽 sidebar 顶层项，sub-list 内 a 进 children",
+    )
+    scan.add_argument(
+        "--adaptive",
+        action="store_true",
+        help="v0.2: 自适应阈值（短词敏感 / 长词宽容）",
     )
     return parser
 
@@ -40,17 +59,40 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd != "scan":
         return 2
 
-    baseline = scan_baseline(args.source, args.sidebar_selector)
-    target = scan_target(args.target, args.sidebar_selector)
-    gap = gap_diff(baseline, target, fuzzy_threshold=args.fuzzy_threshold)
+    alias_map = None
+    if args.alias_map:
+        alias_path = Path(args.alias_map)
+        if not alias_path.exists():
+            print(f"alias map file not found: {alias_path}", file=sys.stderr)
+            return 2
+        raw = json.loads(alias_path.read_text(encoding="utf-8"))
+        # 过滤 _comment 字段
+        alias_map = {k: v for k, v in raw.items() if not k.startswith("_") and isinstance(v, list)}
+
+    baseline = scan_baseline(args.source, args.sidebar_selector, args.top_level_only)
+    target = scan_target(args.target, args.sidebar_selector, args.top_level_only)
+    gap = gap_diff(
+        baseline,
+        target,
+        fuzzy_threshold=args.fuzzy_threshold,
+        alias_map=alias_map,
+        use_adaptive_threshold=args.adaptive,
+    )
 
     print("== Baseline Coverage Audit ==")
     print(f"Source : {args.source}")
     print(f"Target : {args.target}")
+    if alias_map:
+        print(f"Alias  : {len(alias_map)} entries from {args.alias_map}")
+    if args.adaptive:
+        print("Adaptive threshold: ON")
+    if args.top_level_only:
+        print("Top-level only: ON")
     print()
     print(f"Aligned (✓ {len(gap.aligned)}):")
     for it in gap.aligned[:20]:
-        print(f"  ✓ {it.baseline_label}")
+        tag = " [alias]" if it.via_alias else ""
+        print(f"  ✓ {it.baseline_label}{tag}")
     if len(gap.aligned) > 20:
         print(f"  ... +{len(gap.aligned) - 20} more")
     print()
@@ -67,7 +109,6 @@ def main(argv: list[str] | None = None) -> int:
         print()
         print(f"→ Spec written: {args.spec} (section: 覆盖度差距)")
 
-    # 退出码：missing > 0 不影响成功（这是 plan 阶段产物），返回 0
     return 0
 
 

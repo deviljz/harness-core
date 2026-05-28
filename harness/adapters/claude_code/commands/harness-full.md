@@ -28,7 +28,7 @@ pathlib.Path(".harness/active_tasks.json").write_text(json.dumps(data, indent=2)
 ### 第 1 步：execute
 按 `.claude/commands/harness-execute.md` 的规则跑：
 - 读 spec，确认 complexity
-- complex → 每个执行项起独立 subagent（Agent 工具，subagent_type=general-purpose）
+- complex → 每个执行项起独立 subagent（Agent 工具，`subagent_type=general-purpose`，**必须显式 `model="sonnet"`**——不传默认 Opus 烧钱 5x，写代码任务 sonnet 够用）
 - 按 Structure 区列出的文件逐项改
 - PostToolUse hook 自动跑 `harness check --on-edit` 增量验证
 - 单个 hook fail → **当场自修**，不打断流程
@@ -60,13 +60,13 @@ push-back 时给 subagent 的 prompt 模板：
 ### 第 3 步：review
 按 `.claude/commands/harness-review.md` 的规则跑：
 - `harness review-data --spec "$ARGUMENTS"` 拿 JSON
-- 起新的 subagent 跑单 Pass 审查（模板含 Structure + User Flow trace + 数据源 + 集成测试全套核对）
+- 起新的 subagent 跑单 Pass 审查（模板含 Structure + User Flow trace + 数据源 + 集成测试全套核对，**必须显式 `model="sonnet"`**——不传默认 Opus 烧钱 5x）
 - 返回 JSON：
   - `consistent: true` → 把 `review` 从 pending 移到 completed → 进入 commit
   - `consistent: false` → **进入自修循环**（与 check 行为对齐，不直接停）：
     1. 逐条判定 issue 是真是假 — LLM review 常误报"框架声明式约束"（init_db 已 create_all、metadata-based drift、include_router 已注册），先 grep 工程验证
     2. 真 issue 自修 + spec 也需要修就改 spec（路径偏差、轻微措辞）
-    3. 重跑 `harness review-data` → 起**新** subagent 重 review
+    3. 重跑 `harness review-data` → 起**新** subagent 重 review（同样 `model="sonnet"`）
     4. 还 `consistent: false` → **清空 active_tasks.json** → 列出剩余 issues 停下来
     5. 自修上限 2 轮，超过仍 fail 才停（与 check 自修一次的逻辑一致但 review 容忍 2 轮，因为 issue 类型更多样）
 

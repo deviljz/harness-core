@@ -9,7 +9,7 @@ argument-hint: <spec-path>
 
 1. 读 `$ARGUMENTS`，确认 complexity 字段：
    - **simple** → 直接在当前会话实现
-   - **complex** → 为每个执行项起 subagent（通过 Agent 工具）
+   - **complex** → 为每个执行项起 subagent（通过 Agent 工具，**必须显式 `model="sonnet"`**——写代码任务 sonnet 足够，默认 Opus 烧钱 5x）
 2. 运行 `harness execute "$ARGUMENTS"` 解析执行表（若存在）。
 3. 按 Structure 区列出的文件逐项改动。每改完一个文件：
    - 自动有 PostToolUse hook 跑 `harness check --on-edit` 验证

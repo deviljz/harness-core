@@ -10,7 +10,7 @@ argument-hint: <spec-path>
 1. 运行 `harness review-data --spec "$ARGUMENTS"`，stdout 是 JSON，含 `spec_content` / `diff_content` / `template`。
 2. **单 Pass 审查**（用 `template` 默认模板，已含 Structure + User Flow trace + 数据源 + 集成测试全套核对）：
    - 把 spec + diff 塞进 template 得到完整 prompt。
-   - 用 Agent 工具起**全新** `general-purpose` subagent（禁止 SendMessage 续跑旧 agent，防止上下文污染）。
+   - 用 Agent 工具起**全新** `general-purpose` subagent，**必须显式指定 `model="sonnet"`**（不传 = 默认 Opus 烧钱 5x；review 是语义判断任务，sonnet 已足够）。禁止 SendMessage 续跑旧 agent，防止上下文污染。
    - prompt 只包含 spec + diff + 模板文字，**禁止**附加本会话讨论过的结论 / 倾向 / 你自己的判断。
    - 返回 JSON `{"consistent": bool, "issues": [...]}`。
 3. 输出：

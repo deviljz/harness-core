@@ -206,6 +206,24 @@ def doctor():
 
 
 # ════════════════════════════════════════════════════════════════════
+# baseline — 对标参考实现，扫覆盖度差距写入 spec
+# ════════════════════════════════════════════════════════════════════
+
+
+@main.command(
+    "baseline",
+    context_settings=dict(ignore_unknown_options=True, allow_extra_args=True),
+    help="对标参考实现，扫覆盖度差距写入 spec（用法: harness baseline scan --source ... --target ... [--spec ...]）",
+)
+@click.argument("args", nargs=-1, type=click.UNPROCESSED)
+def baseline(args):
+    """转发到 harness_baseline skill 的 CLI（复用其 argparse 实现）。"""
+    from .skills.harness_baseline.cli import main as baseline_main
+
+    sys.exit(baseline_main(list(args)))
+
+
+# ════════════════════════════════════════════════════════════════════
 # plan
 # ════════════════════════════════════════════════════════════════════
 

@@ -18,9 +18,9 @@ argument-hint: <reference-url-or-html-path>
    - `target` = 当前实现的 HTML / 入口文件（在工程里找，找不到就问用户）
    - `spec` = 要写入差距小节的 spec.md（通常是当前 plan 阶段那份；没有就先 `/harness-plan` 建）
 
-2. **跑扫描**（skill 自带 CLI，主 `harness` CLI 未注册 baseline 子命令，用 `python -m`）：
+2. **跑扫描**：
    ```bash
-   python -m harness.skills.harness_baseline.cli scan \
+   harness baseline scan \
      --source "$ARGUMENTS" \
      --target <当前实现 HTML 路径> \
      --spec <spec.md 路径>

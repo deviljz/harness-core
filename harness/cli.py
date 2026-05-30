@@ -224,6 +224,25 @@ def baseline(args):
 
 
 # ════════════════════════════════════════════════════════════════════
+# visual-audit — 对渲染后的 UI 跑 DOM/视觉断言
+# ════════════════════════════════════════════════════════════════════
+
+
+@main.command(
+    "visual-audit",
+    context_settings=dict(ignore_unknown_options=True, allow_extra_args=True),
+    help="对渲染后的 UI（HTML 报告 / web app）跑 DOM/视觉断言"
+    "（用法: harness visual-audit --target ... [--config ...] [--report ...]）",
+)
+@click.argument("args", nargs=-1, type=click.UNPROCESSED)
+def visual_audit(args):
+    """转发到 harness_visual_audit skill 的 CLI（复用其 argparse 实现）。"""
+    from .skills.harness_visual_audit.cli import main as visual_audit_main
+
+    sys.exit(visual_audit_main(list(args)))
+
+
+# ════════════════════════════════════════════════════════════════════
 # plan
 # ════════════════════════════════════════════════════════════════════
 

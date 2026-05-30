@@ -21,6 +21,11 @@ dev = [
     "pytest>=7",
     "pytest-cov",
 ]
+# 渲染后 UI 抓取：baseline URL 模式 + visual-audit 都用 playwright（惰性导入，opt-in）。
+# 装后还需 `playwright install chromium`。
+playwright = [
+    "playwright>=1.40",
+]
 
 [project.scripts]
 harness = "harness.cli:main"

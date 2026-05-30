@@ -52,6 +52,7 @@ trigger:
 | `--spec <path>` | no | 要写入 gap 小节的 spec.md（不传只输出 stdout） |
 | `--sidebar-selector <css>` | no | 自定义 sidebar CSS selector（不传自动检测） |
 | `--fuzzy-threshold <0.0-1.0>` | no | partial 匹配阈值，默认 0.6 |
+| `--top-level-only` | no | 只对比顶层 sidebar 项，不下钻子项 |
 
 ## Output
 
@@ -81,6 +82,12 @@ spec.md (追加小节):
 
 **Action**: 此处列出的 missing/partial 项必须在 §7 Boundaries 显式声明"不做"（带 reason），或在后续 milestone 实现。
 ```
+
+## 硬约束
+
+- source / target 必须都给到（缺一不可）；target 找不到就**问用户**，别瞎猜
+- 差距表必须真写进 spec.md（不是只打印到屏幕）
+- missing / partial 项不允许静默忽略——要么进 §7 Boundaries「绝不做」（带理由），要么排进后续 milestone
 
 ## Limits (MVP)
 

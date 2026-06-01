@@ -291,3 +291,144 @@ def assert_units_on_numeric(
             remediation="在 <th> 加单位 (如 '内存(MB)') 或 td 文本带单位",
         )]
     return [AssertionResult(assertion_id="A4-1", passed=True)]
+
+
+# ============ 通用数据不变量断言（机制层，业务规则由项目 config 提供）============
+#
+# 从报告里按 selector 取数值 → 聚合（sum/max/min/none）→ 和参照值（常量或另一 selector
+# 取值，可乘 factor）按谓词比较。具体业务不变量（marker≤时长、FPS≤cap、占比≤100% 等）
+# **不写进 harness-core**，由调用方在 .harness/ config 的 `data_invariants` 提供。
+#
+# samples 结构（由 runner.py 的 DOM 采集产出，单测可直接构造）:
+#   {selector: {"texts": [textContent, ...], "count": N}}
+
+_NUM_OPS = {
+    "<=": lambda a, b: a <= b,
+    "<": lambda a, b: a < b,
+    ">=": lambda a, b: a >= b,
+    ">": lambda a, b: a > b,
+    "==": lambda a, b: a == b,
+    "!=": lambda a, b: a != b,
+}
+
+_NUMERIC_TOKEN_RE = re.compile(r"[-+]?\d*\.?\d+")
+
+
+def _parse_number(text: Optional[str]) -> Optional[float]:
+    """从文本里抽第一个数值 token（去千分位逗号，容忍单位/百分号后缀）。"""
+    if text is None:
+        return None
+    m = _NUMERIC_TOKEN_RE.search(str(text).replace(",", ""))
+    if not m:
+        return None
+    try:
+        return float(m.group())
+    except ValueError:
+        return None
+
+
+def _resolve_numeric(sample: dict, extract: str, aggregate: str) -> tuple[Optional[float], str]:
+    """从一个 selector 采样里解析出标量值。返回 (value, error)。error 非空表示失败。"""
+    if extract == "count":
+        return float(sample.get("count", 0)), ""
+    if extract.startswith("attr:"):
+        return None, "extract=attr 暂未支持（用 number / count）"
+    if extract not in ("number", "text", ""):
+        return None, f"未知 extract={extract!r}"
+    texts = sample.get("texts", [])
+    nums = [n for n in (_parse_number(t) for t in texts) if n is not None]
+    if not nums:
+        return None, f"未从 {len(texts)} 个元素解析出数值"
+    agg = aggregate or "none"
+    if agg == "none":
+        if len(nums) != 1:
+            return None, f"匹配 {len(nums)} 个值但 aggregate=none（请指定 sum/max/min）"
+        return nums[0], ""
+    if agg == "sum":
+        return sum(nums), ""
+    if agg == "max":
+        return max(nums), ""
+    if agg == "min":
+        return min(nums), ""
+    return None, f"未知 aggregate={agg!r}"
+
+
+def assert_data_invariant(spec: dict, samples: dict) -> AssertionResult:
+    """通用数据不变量断言。
+
+    spec 字段：
+      id          断言 id（必填，会显示在报告里）
+      severity    error | warn（默认 error）
+      remediation 修复建议（缺省用 description）
+      description 人话说明
+      value       {selector, extract=number|count, aggregate=none|sum|max|min}
+      op          <= < >= > == != non_empty empty
+      ref         {const: <num>} 或 {selector, extract, aggregate}（op 为 non_empty/empty 时可省）
+      factor      ref * factor，默认 1.0
+    """
+    inv_id = spec.get("id", "data-invariant")
+    sev = Severity.WARN if spec.get("severity") == "warn" else Severity.ERROR
+    remediation = spec.get("remediation") or spec.get("description", "")
+    value_spec = spec.get("value", {})
+    vsel = value_spec.get("selector", "")
+    op = spec.get("op", "")
+
+    def fail(actual: str, expected: str, note: str = "") -> AssertionResult:
+        return AssertionResult(inv_id, False, sev, vsel, actual, expected, remediation, note)
+
+    def ok(note: str = "") -> AssertionResult:
+        return AssertionResult(inv_id, True, sev, vsel, note=note)
+
+    if not vsel:
+        return fail("缺 value.selector", "value.selector 必填", "config 非法")
+
+    vsample = samples.get(vsel)
+    if vsample is None:
+        return fail(f"selector {vsel!r} 未在快照中采集到", "存在可采集的匹配元素",
+                    "selector 没采到——检查报告是否暴露了机器可读值")
+
+    # non_empty / empty：基于匹配元素个数
+    if op in ("non_empty", "empty"):
+        cnt = vsample.get("count", 0)
+        if op == "non_empty":
+            return ok(f"count={cnt}") if cnt >= 1 else fail("count=0（空）", "至少 1 个匹配元素")
+        return ok(f"count={cnt}") if cnt == 0 else fail(f"count={cnt}（非空）", "0 个匹配元素")
+
+    if op not in _NUM_OPS:
+        return fail(f"未知 op {op!r}", f"{list(_NUM_OPS)} / non_empty / empty", "config op 非法")
+
+    actual_val, err = _resolve_numeric(
+        vsample, value_spec.get("extract", "number"), value_spec.get("aggregate", "none")
+    )
+    if err:
+        return fail(err, "可解析的数值", f"value selector {vsel}")
+
+    ref_spec = spec.get("ref") or {}
+    try:
+        factor = float(spec.get("factor", 1.0))
+    except (TypeError, ValueError):
+        return fail(f"factor={spec.get('factor')!r} 非数值", "数值 factor", "config 非法")
+
+    if "const" in ref_spec:
+        try:
+            ref_base = float(ref_spec["const"])
+        except (TypeError, ValueError):
+            return fail(f"ref.const={ref_spec['const']!r} 非数值", "数值常量", "config 非法")
+    elif ref_spec.get("selector"):
+        rsel = ref_spec["selector"]
+        rsample = samples.get(rsel)
+        if rsample is None:
+            return fail(f"ref selector {rsel!r} 未采集到", "存在", "ref selector 不在快照")
+        ref_base, err = _resolve_numeric(
+            rsample, ref_spec.get("extract", "number"), ref_spec.get("aggregate", "none")
+        )
+        if err:
+            return fail(err, "可解析的 ref 数值", f"ref selector {rsel}")
+    else:
+        return fail("缺 ref", "ref.const 或 ref.selector", "数值 op 必须给 ref")
+
+    threshold = ref_base * factor
+    if _NUM_OPS[op](actual_val, threshold):
+        return ok(f"{actual_val:g} {op} {threshold:g}")
+    expected = f"{op} {threshold:g}" + (f" (={ref_base:g}×{factor:g})" if factor != 1.0 else "")
+    return fail(f"{actual_val:g}", expected)

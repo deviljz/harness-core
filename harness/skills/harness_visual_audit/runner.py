@@ -19,6 +19,7 @@ from .assertions import (
     assert_distinct_hues,
     assert_table_alignment,
     assert_units_on_numeric,
+    assert_data_invariant,
 )
 
 
@@ -50,6 +51,9 @@ DEFAULT_CONFIG: dict = {
         "A3-1": {"enabled": True, "expected_align": "left"},
         "A4-1": {"enabled": True, "units": ["MB", "ms", "KB", "个", "%", "s", "mV", "mW", "fps", "FPS", "B", "次", "帧"]},
     },
+    # 通用数据不变量：harness-core 不内置任何业务规则；由项目 config 提供具体不变量。
+    # 每条 schema 见 assertions.assert_data_invariant / SKILL.md。
+    "data_invariants": [],
 }
 
 
@@ -85,7 +89,6 @@ def run_audit(cfg: AuditConfig) -> AuditResult:
             "and run: playwright install chromium"
         ) from e
 
-    result = AuditResult(target=cfg.target)
     target_url = _to_url(cfg.target)
 
     with sync_playwright() as pw:
@@ -96,6 +99,13 @@ def run_audit(cfg: AuditConfig) -> AuditResult:
 
         snapshot = _collect_dom_snapshot(page, cfg.config)
         browser.close()
+
+    return evaluate_snapshot(cfg, snapshot)
+
+
+def evaluate_snapshot(cfg: AuditConfig, snapshot: dict) -> AuditResult:
+    """纯函数：给定已采集的 DOM 快照，按 config 跑全部断言。不依赖 playwright，可单测。"""
+    result = AuditResult(target=cfg.target)
 
     # === 跑 6 项断言 ===
     a = cfg.config.get("assertions", {})
@@ -137,6 +147,11 @@ def run_audit(cfg: AuditConfig) -> AuditResult:
         units = a["A4-1"].get("units", [])
         for res in assert_units_on_numeric(snapshot.get("table_cells", []), units):
             result.results.append(res)
+
+    # === 通用数据不变量（业务规则由项目 config 的 data_invariants 提供；默认空）===
+    di_samples = snapshot.get("data_invariant_samples", {})
+    for inv in cfg.config.get("data_invariants", []):
+        result.results.append(assert_data_invariant(inv, di_samples))
 
     return result
 
@@ -180,6 +195,7 @@ async (config) => {
     chart_line_colors: {},
     td_num_aligns: {},
     table_cells: [],
+    data_invariant_samples: {},
   };
 
   // Chart tooltips (A1-1)
@@ -268,6 +284,20 @@ async (config) => {
       });
     });
   });
+
+  // Data invariants (通用): 为每个 invariant 的 value/ref selector 采集 {texts, count}
+  function collectSelectorSamples(sel) {
+    if (!sel || out.data_invariant_samples[sel]) return;
+    const els = [...document.querySelectorAll(sel)];
+    out.data_invariant_samples[sel] = {
+      texts: els.slice(0, 1000).map(e => (e.textContent || '').replace(/\s+/g, ' ').trim()),
+      count: els.length,
+    };
+  }
+  for (const inv of (config.data_invariants || [])) {
+    if (inv && inv.value && inv.value.selector) collectSelectorSamples(inv.value.selector);
+    if (inv && inv.ref && inv.ref.selector) collectSelectorSamples(inv.ref.selector);
+  }
 
   return out;
 }

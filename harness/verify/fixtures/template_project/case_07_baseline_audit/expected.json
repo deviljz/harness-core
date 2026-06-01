@@ -1,0 +1,7 @@
+{
+  "consistent": true,
+  "required_keywords": [],
+  "soft_keywords": [],
+  "min_issues_count": 0,
+  "_note": "baseline 工具 fixture（见 expected.md 的 gap 预期）。无 worktree 代码改动 → review 视角为 consistent。"
+}

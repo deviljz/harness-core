@@ -1,0 +1,7 @@
+{
+  "consistent": true,
+  "required_keywords": [],
+  "soft_keywords": [],
+  "min_issues_count": 0,
+  "_note": "visual-audit 工具 fixture（见 expected_fails.md 的断言预期）。无 spec/worktree → review 视角为 consistent。"
+}

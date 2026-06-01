@@ -40,7 +40,8 @@ def main():
 @click.option("--local", is_flag=True, help="hook 写入 .claude/settings.local.json（不入 git）")
 @click.option("--no-hooks", is_flag=True, help="跳过 Claude Code hook 安装")
 @click.option("--with-gate", is_flag=True, help="额外装 Stop hook（每轮对话结束跑 --gate）；默认不装避免在没改代码的对话中也触发全量")
-def init(force: bool, reset_config: bool, local: bool, no_hooks: bool, with_gate: bool):
+@click.option("--pre-commit", is_flag=True, help="额外装 git pre-commit hook（提交前跑 harness check 拦红）；适合无 Claude Code auto-hook 的工具/CI（可配 --no-hooks 用）")
+def init(force: bool, reset_config: bool, local: bool, no_hooks: bool, with_gate: bool, pre_commit: bool):
     from .adapters.claude_code import install_hooks
 
     cwd = Path.cwd()
@@ -67,6 +68,15 @@ def init(force: bool, reset_config: bool, local: bool, no_hooks: bool, with_gate
         scope = "local" if local else "shared"
         path = install_hooks(cwd, scope=scope, with_gate=with_gate)
         console.print(f"[green]✓[/green] hooks installed: {path}")
+
+    if pre_commit:
+        from .adapters.generic import install_precommit_hook
+
+        hook = install_precommit_hook(cwd)
+        if hook:
+            console.print(f"[green]✓[/green] git pre-commit hook: {hook}")
+        else:
+            console.print("[yellow]! pre-commit 跳过：非 git 仓库，或已有非 harness 的 pre-commit（未覆盖）[/yellow]")
 
     console.print("\nNext steps:")
     console.print("  1. Edit .harness/config.yaml (fill `targets`)")
@@ -348,23 +358,59 @@ def review_data(spec_path: str | None, base: str):
 @main.command(help="对最近 diff 做 review（直接调 LLM provider；推荐走 skill 更灵活）")
 @click.option("--spec", "spec_path", type=click.Path(exists=True), default=None)
 @click.option("--base", type=str, default="HEAD", help="git diff base")
-def review(spec_path: str | None, base: str):
-    """走 LLM provider（manual / 将来的 openai 等）。skill 模式下推荐 review-data。"""
-    from .llm import get_provider
-    from .review import run_review
+@click.option("--emit-prompt", is_flag=True,
+              help="非轮询模式第一步：只把 review prompt 写到文件后退出（不调 LLM）")
+@click.option("--response-file", "response_file", type=click.Path(), default=None,
+              help="非轮询模式：从该文件读外部 AI 的 review JSON 回灌（不调 LLM、不轮询）")
+def review(spec_path: str | None, base: str, emit_prompt: bool, response_file: str | None):
+    """走 LLM provider（manual / 将来的 openai 等）。skill 模式下推荐 review-data。
+
+    非轮询两步模式（适合 Hermes 等自跑 CLI 的 AI，避免 manual provider 轮询超时）：
+      1. harness review --spec X --emit-prompt --response-file r.json   # 出 prompt 到 r.json.prompt.md
+      2. <外部 AI 审 prompt，把 {"consistent":..,"issues":[..]} 写进 r.json>
+      3. harness review --spec X --response-file r.json                 # 回灌，不轮询
+    """
+    from .review import build_review_prompt, parse_review_response, run_review
 
     cfg = load_config()
     cfg_path = find_config()
     root = _project_root(cfg_path)
+    focus = ",".join(cfg.review.focus) if cfg.review.focus else "api_contract"
+    spec = Path(spec_path) if spec_path else None
 
-    provider = get_provider(cfg.llm.provider, cfg.llm.model_dump())
-    result = run_review(
-        provider,
-        root,
-        Path(spec_path) if spec_path else None,
-        focus=",".join(cfg.review.focus) if cfg.review.focus else "api_contract",
-        diff_base=base,
-    )
+    # 第一步：只出 prompt
+    if emit_prompt:
+        prompt = build_review_prompt(root, spec, focus=focus, diff_base=base)
+        if prompt is None:
+            console.print("[yellow]空 diff，无需 review[/yellow]")
+            return
+        out = Path(response_file + ".prompt.md") if response_file else (root / ".harness" / "review_prompt.md")
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(prompt, encoding="utf-8")
+        console.print(f"[green]✓ prompt 已写入:[/green] {out}")
+        console.print(
+            "把审查结果 JSON `{\"consistent\": bool, \"issues\": [\"文件:行 - 问题\"]}` 写入 "
+            f"{response_file or '<file>'}，再跑 `harness review --spec ... --response-file <file>`"
+        )
+        return
+
+    # 回灌：从文件读 review 结果（不调 LLM、不轮询）
+    if response_file:
+        rf = Path(response_file)
+        if not rf.exists():
+            err_console.print(f"[red]✗ response file 不存在: {rf}[/red]")
+            err_console.print(
+                "先跑 `harness review --spec ... --emit-prompt --response-file <file>` 生成 prompt，"
+                "外部 AI 审完写入该文件再重跑。"
+            )
+            sys.exit(2)
+        result = parse_review_response(rf.read_text(encoding="utf-8"))
+    else:
+        # 默认：调 provider（manual 会轮询；非交互场景推荐用上面的 --emit-prompt/--response-file 两步）
+        from .llm import get_provider
+
+        provider = get_provider(cfg.llm.provider, cfg.llm.model_dump())
+        result = run_review(provider, root, spec, focus=focus, diff_base=base)
 
     if result.error:
         err_console.print(f"[red]✗ {result.error}[/red]")

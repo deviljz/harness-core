@@ -47,37 +47,33 @@ def _extract_json(text: str) -> dict | None:
     return None
 
 
-def run_review(
-    provider: LLMProvider,
+def build_review_prompt(
     project_root: Path,
     spec_path: Path | None,
     *,
     focus: str = "api_contract, error_handling",
     diff_base: str = "HEAD",
-) -> ReviewResult:
-    """跑一次 review。
+) -> str | None:
+    """打包 diff+spec 填模板，返回 review prompt。空 diff 返 None。
 
-    - 打包 diff + spec
-    - 填模板
-    - 调 provider.complete
-    - 解析 JSON
+    供非轮询两步模式（--emit-prompt）和 run_review 共用。
     """
     packed = package_diff(project_root, spec_path, diff_base=diff_base)
     if not packed["diff_content"].strip():
-        return ReviewResult(consistent=True, issues=[], error="empty diff, nothing to review")
-
+        return None
     template = _load_template()
-    prompt = template.format(
+    return template.format(
         spec_content=packed["spec_content"] or "(no spec provided)",
         diff_content=packed["diff_content"],
         focus=focus,
     )
 
-    try:
-        response = provider.complete(prompt)
-    except Exception as e:
-        return ReviewResult(consistent=False, issues=[], error=f"LLM call failed: {e}")
 
+def parse_review_response(response: str) -> ReviewResult:
+    """把外部 AI 回的文本解析成 ReviewResult（裸 JSON / ```json``` 均可）。
+
+    供非轮询 --response-file 模式和 run_review 共用。
+    """
     data = _extract_json(response)
     if data is None:
         return ReviewResult(
@@ -86,9 +82,29 @@ def run_review(
             raw_response=response[:2000],
             error="parse_error",
         )
-
     return ReviewResult(
         consistent=bool(data.get("consistent", False)),
         issues=list(data.get("issues", [])),
         raw_response=response[:2000],
     )
+
+
+def run_review(
+    provider: LLMProvider,
+    project_root: Path,
+    spec_path: Path | None,
+    *,
+    focus: str = "api_contract, error_handling",
+    diff_base: str = "HEAD",
+) -> ReviewResult:
+    """跑一次 review：打包 → 填模板 → 调 provider.complete → 解析 JSON。"""
+    prompt = build_review_prompt(project_root, spec_path, focus=focus, diff_base=diff_base)
+    if prompt is None:
+        return ReviewResult(consistent=True, issues=[], error="empty diff, nothing to review")
+
+    try:
+        response = provider.complete(prompt)
+    except Exception as e:
+        return ReviewResult(consistent=False, issues=[], error=f"LLM call failed: {e}")
+
+    return parse_review_response(response)

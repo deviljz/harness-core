@@ -27,7 +27,8 @@ from harness.skills.harness_baseline.scanner import (
 )
 
 
-FIXTURES = Path(__file__).parent / "fixtures" / "template_project" / "case_07_baseline_audit"
+from harness.verify.cli import _FIXTURES_ROOT
+FIXTURES = _FIXTURES_ROOT / "template_project" / "case_07_baseline_audit"
 
 
 def _mk(labels: list[str]) -> ScanResult:

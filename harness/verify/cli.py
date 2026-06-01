@@ -13,9 +13,10 @@ from .runner import run_fixture
 console = Console()
 err_console = Console(stderr=True)
 
-# Fixtures root relative to this package (harness/verify/ -> ../../tests/fixtures)
+# Fixtures 打包进 harness 包内（harness/verify/fixtures/），保证 pip wheel 能带上。
+# 放 tests/ 下会被 pyproject exclude=["tests*"] 排除 → 装完 "No fixtures found"。
 _HERE = Path(__file__).parent
-_FIXTURES_ROOT = _HERE.parent.parent / "tests" / "fixtures"
+_FIXTURES_ROOT = _HERE / "fixtures"
 _REGRESSION_DIR = _FIXTURES_ROOT / "regression"
 _TEMPLATE_DIR = _FIXTURES_ROOT / "template_project"
 

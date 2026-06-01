@@ -42,6 +42,8 @@ exclude = ["tests*"]
 # Claude Code 识别不到 skill（识别靠 SKILL.md frontmatter），
 # 导致 /harness-baseline 等 slash command 在新会话不可见
 "harness.skills" = ["**/SKILL.md", "**/*.json", "**/*.yaml", "**/*.yml"]
+# verify 自检 fixtures：必须随包发，否则 pip 装完 `harness verify` 报 No fixtures found
+"harness.verify" = ["fixtures/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

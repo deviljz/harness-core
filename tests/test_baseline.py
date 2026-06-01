@@ -17,7 +17,8 @@ from harness.skills.harness_baseline.diff import GapResult, GapItem
 from harness.skills.harness_baseline.scanner import ScanResult, SidebarItem
 
 
-FIXTURES = Path(__file__).parent / "fixtures" / "template_project" / "case_07_baseline_audit"
+from harness.verify.cli import _FIXTURES_ROOT
+FIXTURES = _FIXTURES_ROOT / "template_project" / "case_07_baseline_audit"
 
 
 # ============ Scanner tests ============

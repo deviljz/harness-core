@@ -8,6 +8,19 @@ from pathlib import Path
 from ..base import LanguageModule, TestResult, TestRunResult, run_command
 
 
+def _resolve_flutter(target_config: dict) -> str:
+    """选用哪个 flutter 可执行文件跑 test。
+
+    默认 "flutter"（走 PATH，Windows 上由 shell 解析 .bat）；
+    target_config["flutter_bin"] 可显式覆盖到特定 SDK / 非 PATH 安装。
+    与 python 的 _resolve_python、unity 的 _resolve_unity_exe 范式一致。
+    """
+    explicit = target_config.get("flutter_bin")
+    if explicit:
+        return str(explicit)
+    return "flutter"
+
+
 class DartModule(LanguageModule):
     name = "dart"
 
@@ -56,7 +69,7 @@ class DartModule(LanguageModule):
         root_rel = target_config.get("root", ".")
         cwd = project_root / root_rel if not Path(root_rel).is_absolute() else Path(root_rel)
 
-        cmd_parts = ["flutter", "test", "--reporter=expanded"]
+        cmd_parts = [_resolve_flutter(target_config), "test", "--reporter=expanded"]
         if test_files:
             # flutter test 需要相对 cwd 的路径；转一下
             for tf in test_files:

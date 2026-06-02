@@ -1,6 +1,7 @@
 """Python 语言模块测试"""
 from __future__ import annotations
 
+import sys
 import textwrap
 from pathlib import Path
 
@@ -10,6 +11,7 @@ from harness.languages import get_language_module
 from harness.languages.python import PythonModule
 from harness.languages.python.assertion_ast import check_test_file
 from harness.languages.python.finder import find_related_test_files, is_test_file
+from harness.languages.python.runner import run_pytest
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -236,3 +238,53 @@ class TestRunner:
         result = mod.parse_results(raw)
         # 退出码非 0，应当有 error 或 failed 登记
         assert result.errors + result.failed >= 1
+
+
+# ════════════════════════════════════════════════════════════════════
+# 解释器解析（可移植性回归守卫）
+# ════════════════════════════════════════════════════════════════════
+
+
+class TestInterpreterResolution:
+    """守卫 run_pytest 用 sys.executable（当前解释器）而非字面量 'python'。
+
+    背景：Windows 上裸 'python' 会被 App 执行别名 / 其它 Python 安装劫持到非 venv
+    解释器（缺 pytest + 项目依赖）→ collection error。sys.executable = harness 当前
+    运行的解释器，稳定命中正确环境。支持 target_config['python_bin'] 显式覆盖
+    （harness 与项目不在同一 venv / CI 多版本矩阵 / conda 跨环境）。
+    """
+
+    def _fake_run_capturing(self, captured: dict):
+        class _Done:
+            returncode = 0
+            stdout = "1 passed in 0.01s"
+            stderr = ""
+
+        def _run(cmd, **kwargs):
+            captured["cmd"] = cmd
+            return _Done()
+
+        return _run
+
+    def test_resolve_defaults_to_sys_executable(self):
+        from harness.languages.python.runner import _resolve_python
+
+        assert _resolve_python({}) == sys.executable
+
+    def test_resolve_respects_python_bin(self):
+        from harness.languages.python.runner import _resolve_python
+
+        assert _resolve_python({"python_bin": "/opt/venv/bin/python"}) == "/opt/venv/bin/python"
+
+    def test_run_pytest_cmd_uses_sys_executable(self, monkeypatch, tmp_path):
+        captured: dict = {}
+        monkeypatch.setattr("subprocess.run", self._fake_run_capturing(captured))
+        run_pytest([], {}, tmp_path)
+        assert captured["cmd"][0] == sys.executable
+        assert captured["cmd"][1:3] == ["-m", "pytest"]
+
+    def test_run_pytest_cmd_respects_python_bin(self, monkeypatch, tmp_path):
+        captured: dict = {}
+        monkeypatch.setattr("subprocess.run", self._fake_run_capturing(captured))
+        run_pytest([], {"python_bin": "/custom/py"}, tmp_path)
+        assert captured["cmd"][0] == "/custom/py"

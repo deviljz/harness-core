@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
 
 from ..base import TestResult, TestRunResult, run_command
@@ -18,6 +19,26 @@ from ..base import TestResult, TestRunResult, run_command
 # ════════════════════════════════════════════════════════════════════
 # 运行
 # ════════════════════════════════════════════════════════════════════
+
+
+def _resolve_python(target_config: dict) -> str:
+    """选用哪个 Python 解释器跑 pytest。
+
+    优先级：
+    1. target_config["python_bin"] —— 显式覆盖：harness 与项目不在同一 venv、
+       CI 多版本矩阵、conda 跨环境时指定项目自己的解释器。
+    2. sys.executable —— harness 当前运行的解释器。用户在项目 venv 里跑 harness
+       时即该 venv 的 python，自带 pytest + 项目依赖。修复 Windows 下裸 "python"
+       被 App 执行别名 / 其它 Python 安装劫持到无 pytest 环境的问题（实测：即便
+       激活 venv、强制 PATH 仍可能解析到错误解释器，非 PATH 能修）。
+
+    （注：unity_csharp 模块早已用 _resolve_unity_exe 从 config 解析可执行路径，
+    此处与之对齐。）
+    """
+    explicit = target_config.get("python_bin")
+    if explicit:
+        return str(explicit)
+    return sys.executable
 
 
 def run_pytest(
@@ -29,7 +50,7 @@ def run_pytest(
     timeout: int = 600,
 ) -> TestRunResult:
     """跑 pytest。test_files 为空 → 全量"""
-    cmd: list[str] = ["python", "-m", "pytest", "-v", "--tb=short", "--no-header"]
+    cmd: list[str] = [_resolve_python(target_config), "-m", "pytest", "-v", "--tb=short", "--no-header"]
     if extra_args:
         cmd.extend(extra_args)
     if test_files:

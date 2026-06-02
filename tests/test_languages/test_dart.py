@@ -83,3 +83,40 @@ class TestParseResults:
         result = mod.parse_results(self._raw(out, 1))
         assert result.failed == 1
         assert len(result.failures) >= 1
+
+
+class TestFlutterResolution:
+    """守卫 flutter 可执行路径可配置（flutter_bin），默认 'flutter'。
+
+    与 python 的 _resolve_python / unity 的 _resolve_unity_exe 范式一致：
+    flutter 不在 PATH 或需指定特定 SDK 时，target_config['flutter_bin'] 覆盖。
+    """
+
+    def test_resolve_defaults_to_flutter(self):
+        from harness.languages.dart import _resolve_flutter
+
+        assert _resolve_flutter({}) == "flutter"
+
+    def test_resolve_respects_flutter_bin(self):
+        from harness.languages.dart import _resolve_flutter
+
+        assert _resolve_flutter({"flutter_bin": "/opt/flutter/bin/flutter"}) == "/opt/flutter/bin/flutter"
+
+    def test_run_tests_cmd_uses_flutter_bin(self, monkeypatch, tmp_path):
+        captured: dict = {}
+
+        def _fake_run_command(cmd, cwd, timeout=600):
+            captured["cmd"] = cmd
+            return TestRunResult(
+                cmd=str(cmd), cwd=str(cwd), exit_code=0,
+                stdout="All tests passed!", stderr="", duration_ms=1,
+            )
+
+        monkeypatch.setattr("harness.languages.dart.run_command", _fake_run_command)
+        DartModule().run_tests([], {"flutter_bin": "/custom/flutter"}, tmp_path)
+
+        cmd = captured["cmd"]
+        # win32 下 run_tests 把 cmd join 成 shell 字符串，其它平台是 list；统一成 token 序列
+        tokens = cmd.split() if isinstance(cmd, str) else cmd
+        assert tokens[0] == "/custom/flutter"
+        assert tokens[1] == "test"

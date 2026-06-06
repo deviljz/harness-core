@@ -20,6 +20,7 @@ from .assertions import (
     assert_table_alignment,
     assert_units_on_numeric,
     assert_data_invariant,
+    assert_script_invariant,
 )
 from .report import build_markdown_report
 
@@ -36,6 +37,7 @@ __all__ = [
     "assert_table_alignment",
     "assert_units_on_numeric",
     "assert_data_invariant",
+    "assert_script_invariant",
     "build_markdown_report",
 ]
 

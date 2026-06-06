@@ -432,3 +432,64 @@ def assert_data_invariant(spec: dict, samples: dict) -> AssertionResult:
         return ok(f"{actual_val:g} {op} {threshold:g}")
     expected = f"{op} {threshold:g}" + (f" (={ref_base:g}×{factor:g})" if factor != 1.0 else "")
     return fail(f"{actual_val:g}", expected)
+
+
+# ============ 脚本不变量（在报告页内跑任意 JS 求值，全数据集 sanity）============
+#
+# Why this exists（区别于 assert_data_invariant）:
+#   data_invariant 是「按 selector 取 DOM 文本 → 比较」，只能读 DOM 上**当前可见**的值。
+#   但有些 sanity 要遍历**整个内存数据集**（如 Periscope 全部卡顿帧逐帧跑 spkCatNs，
+#   验「单帧任何分类耗时 ≤ frameMs」「占比和 ≤ 100%」），DOM 一次只显一帧，selector 取不到。
+#   且分类口径已经在报告 JS 里（spkCatNs），在 Python 重写一遍 = 口径漂移 = 新 bug 源。
+#   → 直接在已加载报告的 chrome 页里跑 JS 表达式，复用报告自己的函数/数据，零口径漂移。
+#
+# eval_result 由 runner.py 在 page 内对 spec.expr 求值产出（单测可直接构造）:
+#   - {"pass": bool, "actual": str, "expected": str}  ← 推荐：表达式自己给裁决+明细
+#   - bool                                            ← 简写：true=pass
+#   - {"error": str}                                  ← 表达式抛错
+#   - None                                            ← 表达式没产出（id 未采集/页面没跑）
+
+
+def assert_script_invariant(spec: dict, eval_result) -> AssertionResult:
+    """脚本不变量断言。表达式在报告页全局作用域求值，可访问报告内联的全局函数/数据。
+
+    spec 字段：
+      id          断言 id（必填，显示在报告里）
+      severity    error | warn（默认 error）
+      description 人话说明（作为 selector 列显示）
+      remediation 修复建议（缺省用 description）
+      expr        页面内 JS 表达式（必填）。约定返回 {pass, actual, expected} 或 bool。
+                  可访问报告全局变量（如 spkCatNs / JANK_FRAMES / COUNTERS / FRAMES_MS）。
+    """
+    inv_id = spec.get("id", "script-invariant")
+    sev = Severity.WARN if spec.get("severity") == "warn" else Severity.ERROR
+    desc = spec.get("description", "")
+    remediation = spec.get("remediation") or desc
+
+    def fail(actual: str, expected: str, note: str = "") -> AssertionResult:
+        return AssertionResult(inv_id, False, sev, desc, actual, expected, remediation, note)
+
+    def ok(note: str = "") -> AssertionResult:
+        return AssertionResult(inv_id, True, sev, desc, note=note)
+
+    if not spec.get("id"):
+        # JS 采集侧 (!inv.id) 会直接跳过该条目——必须在这里给准确报错，
+        # 否则落到「表达式未产出结果」分支，误导排查方向。
+        return fail("缺 id", "id 必填（结果按 id 存取）", "config 非法")
+    if not spec.get("expr"):
+        return fail("缺 expr", "expr 必填（页面内 JS 表达式）", "config 非法")
+    if eval_result is None:
+        return fail("表达式未产出结果", "返回 {pass, actual, expected} 或 bool",
+                    "页面未求值 / id 未采集——检查 runner 是否注入了该 invariant")
+    if isinstance(eval_result, dict) and eval_result.get("error"):
+        return fail(f"expr 抛错: {eval_result['error']}", "expr 正常求值",
+                    "检查页面作用域是否有所需函数/数据（如 spkCatNs / JANK_FRAMES）")
+    if isinstance(eval_result, bool):
+        return ok("true") if eval_result else fail("expr 返回 false", "expr 返回 true")
+    if isinstance(eval_result, dict) and "pass" in eval_result:
+        if eval_result["pass"]:
+            return ok(str(eval_result.get("actual", "")))
+        return fail(str(eval_result.get("actual", "false")),
+                    str(eval_result.get("expected", "pass=true")))
+    return fail(f"无法识别的结果: {eval_result!r}",
+                "{pass, actual, expected} 或 bool", "expr 返回值格式不符约定")

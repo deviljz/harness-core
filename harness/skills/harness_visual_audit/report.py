@@ -22,7 +22,7 @@ def build_markdown_report(result: "AuditResult") -> str:
         lines.append("## Failures")
         lines.append("")
         for r in failed:
-            lines.append(f"### [{r.assertion_id}] `{r.selector}`")
+            lines.append(f"### [{r.assertion_id}] `{r.selector}` ({r.severity.value})")
             if r.actual:
                 lines.append(f"- **Actual**: {r.actual}")
             if r.expected:
@@ -53,7 +53,7 @@ def print_console_summary(result: "AuditResult") -> None:
     print(f"✗ FAIL : {len(failed)}")
     print()
     for r in failed:
-        print(f"  ✗ [{r.assertion_id}] {r.selector}")
+        print(f"  ✗ [{r.assertion_id}] ({r.severity.value}) {r.selector}")
         if r.actual:
             print(f"      actual: {r.actual}")
         if r.expected:

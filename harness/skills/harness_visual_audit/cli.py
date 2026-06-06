@@ -7,6 +7,7 @@ import json
 import sys
 from pathlib import Path
 
+from .assertions import Severity
 from .runner import run_audit, AuditConfig, DEFAULT_CONFIG
 from .report import print_console_summary, write_report
 
@@ -47,7 +48,12 @@ def main(argv: list[str] | None = None) -> int:
         write_report(result, args.report)
         print()
         print(f"→ Report: {args.report}")
-    return 1 if result.failed else 0
+    # --fail-on=error（默认）：仅 error 级失败挡门；--fail-on=warn：任何失败都挡门
+    if args.fail_on == "warn":
+        blocking = result.failed
+    else:
+        blocking = [r for r in result.failed if r.severity == Severity.ERROR]
+    return 1 if blocking else 0
 
 
 if __name__ == "__main__":

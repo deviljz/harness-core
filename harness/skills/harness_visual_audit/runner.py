@@ -20,6 +20,7 @@ from .assertions import (
     assert_table_alignment,
     assert_units_on_numeric,
     assert_data_invariant,
+    assert_script_invariant,
 )
 
 
@@ -54,6 +55,9 @@ DEFAULT_CONFIG: dict = {
     # 通用数据不变量：harness-core 不内置任何业务规则；由项目 config 提供具体不变量。
     # 每条 schema 见 assertions.assert_data_invariant / SKILL.md。
     "data_invariants": [],
+    # 脚本不变量：在报告页内跑任意 JS 求值，做全数据集 sanity（DOM 取不到的）。
+    # 每条 schema 见 assertions.assert_script_invariant / SKILL.md。
+    "script_invariants": [],
 }
 
 
@@ -153,6 +157,11 @@ def evaluate_snapshot(cfg: AuditConfig, snapshot: dict) -> AuditResult:
     for inv in cfg.config.get("data_invariants", []):
         result.results.append(assert_data_invariant(inv, di_samples))
 
+    # === 脚本不变量（页面内 JS 求值，全数据集 sanity；默认空）===
+    si_results = snapshot.get("script_invariant_results", {})
+    for inv in cfg.config.get("script_invariants", []):
+        result.results.append(assert_script_invariant(inv, si_results.get(inv.get("id"))))
+
     return result
 
 
@@ -196,6 +205,7 @@ async (config) => {
     td_num_aligns: {},
     table_cells: [],
     data_invariant_samples: {},
+    script_invariant_results: {},
   };
 
   // Chart tooltips (A1-1)
@@ -297,6 +307,20 @@ async (config) => {
   for (const inv of (config.data_invariants || [])) {
     if (inv && inv.value && inv.value.selector) collectSelectorSamples(inv.value.selector);
     if (inv && inv.ref && inv.ref.selector) collectSelectorSamples(inv.ref.selector);
+  }
+
+  // Script invariants (通用): 在报告页全局作用域内对 expr 求值，复用报告自己的函数/数据
+  // (spkCatNs / JANK_FRAMES / COUNTERS …)，避免在 Python 重写口径。约定返回 {pass,actual,expected} 或 bool。
+  for (const inv of (config.script_invariants || [])) {
+    if (!inv || !inv.id || !inv.expr) continue;
+    try {
+      // expr 在全局作用域求值：报告模板直接拼进单个 <script>，顶层 function/var 均为全局可访问
+      const fn = new Function('return (' + inv.expr + ');');
+      const r = fn();
+      out.script_invariant_results[inv.id] = (r instanceof Promise) ? await r : r;
+    } catch (e) {
+      out.script_invariant_results[inv.id] = { error: String((e && e.message) || e) };
+    }
   }
 
   return out;

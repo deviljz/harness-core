@@ -7,6 +7,15 @@ import json
 import sys
 from pathlib import Path
 
+# Windows 下强制 UTF-8，避免输出 ✓ ✗ 等 unicode 字符挂 gbk（与 harness/cli.py 同范式；
+# 本模块可经 python -m 单独入口运行，不经过 harness/cli.py 的 reconfigure）
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
 from .assertions import Severity
 from .runner import run_audit, AuditConfig, DEFAULT_CONFIG
 from .report import print_console_summary, write_report

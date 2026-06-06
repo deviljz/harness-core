@@ -10,7 +10,9 @@ import os
 import subprocess
 import sys
 
-_SNIPPET = (
+import pytest
+
+_VISUAL_AUDIT_SNIPPET = (
     "from harness.skills.harness_visual_audit import cli\n"  # 入口 import 应触发编码兜底
     "from harness.skills.harness_visual_audit.runner import AuditResult\n"
     "from harness.skills.harness_visual_audit.assertions import AssertionResult\n"
@@ -22,11 +24,20 @@ _SNIPPET = (
     "print_console_summary(r)\n"
 )
 
+# baseline cli 同样打 ✓ ❌ →；import 入口模块应触发 reconfigure 兜底
+_BASELINE_SNIPPET = (
+    "from harness.skills.harness_baseline import cli\n"
+    "print('\\u2713 \\u274c \\u2192')\n"
+)
 
-def test_console_summary_survives_gbk_stdout():
+
+@pytest.mark.parametrize(
+    "snippet", [_VISUAL_AUDIT_SNIPPET, _BASELINE_SNIPPET], ids=["visual_audit", "baseline"]
+)
+def test_cli_unicode_output_survives_gbk_stdout(snippet):
     env = {**os.environ, "PYTHONIOENCODING": "gbk", "PYTHONUTF8": "0"}
     proc = subprocess.run(
-        [sys.executable, "-c", _SNIPPET],
+        [sys.executable, "-c", snippet],
         capture_output=True,
         env=env,
         timeout=60,

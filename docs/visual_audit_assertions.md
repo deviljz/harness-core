@@ -156,6 +156,22 @@ def assert_text_contrast(page, min_ratio=4.5):
 
 ---
 
+## 通用不变量（data_invariants / script_invariants）
+
+A1-A6 是**通用 UI 规范**断言；业务数值的 sanity 由项目 config 以「不变量」声明——机制在 harness-core，口径在项目：
+
+| | data_invariants | script_invariants |
+|---|---|---|
+| 取数方式 | CSS selector 取 DOM textContent → 解析数值 | 在已加载报告页内对 JS 表达式求值 |
+| 能验什么 | DOM 上**当前可见**的值（单值/一列聚合 sum/max/min） | **整个内存数据集**（DOM 一次只渲染一帧/一行时） |
+| 风格 | 声明式（selector + op + ref，无需写 JS） | 命令式逃生舱（expr 复用报告自己的全局函数/数据，零口径漂移） |
+| 结果约定 | runner 采样 → Python 比较 | expr 返回 `{pass, actual, expected}` 或 `bool`，Promise 自动 await，抛错判 FAIL |
+
+何时用哪个、schema 与信任边界见 `harness/skills/harness_visual_audit/SKILL.md`。
+两类均支持 `severity: error|warn`；CLI `--fail-on` 控制 warn 是否挡退出码（默认仅 error 挡门）。
+
+---
+
 ## skill 输入设计
 
 ```yaml

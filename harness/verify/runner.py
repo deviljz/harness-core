@@ -66,6 +66,18 @@ def _build_diff_from_worktree(worktree_dir: Path) -> str:
     return "\n".join(parts)
 
 
+# verify 跑 fixture 时，reviewer（驱动 harness 的 agent）有文件工具，会顺着 diff 里的
+# 路径去读真实仓库同名文件——若真实仓库已修复，fixture 的坏代码被好代码覆盖 → 假绿。
+# 故 verify 的 prompt 前置此隔离约束（仅 verify 路径，不动正常 review 模板的 Pass B
+# trace 能力）。被审代码 = diff 全部真相，禁止读仓库其他文件。
+_ISOLATION_GUARD = (
+    "> ⚠️ 隔离审查材料（verify fixture）：下面的 spec 与 diff 是自包含的审查样本，\n"
+    "> 被审查的代码就是 diff 里贴出的全部内容。\n"
+    "> **禁止使用 Read / Grep / Glob 等工具去读取仓库里的任何其他文件或所谓「真实版本」**——\n"
+    "> diff 即全部真相。仓库里的同名文件可能是无关或已变更的版本，读它会污染本次判断。\n\n"
+)
+
+
 def _build_prompt(fixture: FixtureData, template: str) -> str:
     """Fill the review prompt template with fixture data."""
     # Include subagent_report in diff_content so the LLM can evaluate it
@@ -75,11 +87,12 @@ def _build_prompt(fixture: FixtureData, template: str) -> str:
             "\n\n--- Subagent Review Report ---\n"
             + fixture.subagent_report
         )
-    return template.format(
+    body = template.format(
         spec_content=fixture.spec_content or "(no spec provided)",
         diff_content=augmented_diff or "(no diff)",
         focus="api_contract, user_flow, testing",
     )
+    return _ISOLATION_GUARD + body
 
 
 def _load_review_template() -> str:

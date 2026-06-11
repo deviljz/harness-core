@@ -156,6 +156,45 @@ def validate_spec(spec_path: Path) -> list[ValidationIssue]:
                     )
                 )
 
+        # 7. 状态累积（涉及重试/失败恢复时必须测连续 N 轮不累积）
+        # 来源：2026-06 选图打卡失败重试缩略图翻倍 1→2→4——单次重试被掩盖，连续 N 轮才暴露
+        retry_markers = ["重试", "retry", "失败恢复", "失败重试", "resetFailed"]
+        if any(m in full_lower for m in [x.lower() for x in retry_markers]):
+            accumulation_markers = [
+                "累积", "连续", "n 轮", "n轮", "多轮", "不重复", "不翻倍",
+                "invariant", "removewhere", "alreadypending", "去重",
+            ]
+            if not any(m in testing_body.lower() for m in accumulation_markers):
+                issues.append(
+                    ValidationIssue(
+                        "warning",
+                        "Testing 段涉及重试/失败恢复但未发现状态累积守卫关键词"
+                        "（连续 N 轮 / 累积 / 不重复 / invariant 等）。"
+                        "重试类必须测「失败→重试→再失败→再重试，断言状态不累积」——"
+                        "单次重试看不出（2026-06 选图打卡重试缩略图翻倍 1→2→4 即此盲区）。",
+                    )
+                )
+
+        # 8. 异步慢依赖中间态（涉及上传进度/乐观渲染时必须注入慢依赖断言中间态）
+        # 来源：2026-06 选图打卡进度卡 100%——小图秒传把"100%→完成"空窗压成 0ms 掩盖
+        midstate_trigger = ["进度", "progress", "乐观", "optimistic", "百分比", "loading"]
+        if any(m in full_lower for m in [x.lower() for x in midstate_trigger]):
+            slowdep_markers = [
+                "慢依赖", "中间态", "延迟", "delay", "completer", "fake service",
+                "fakeservice", "处理中", "未完成", "in-flight", "in flight", "stub",
+            ]
+            if not any(m in testing_body.lower() for m in slowdep_markers):
+                issues.append(
+                    ValidationIssue(
+                        "warning",
+                        "Testing 段涉及上传进度/乐观渲染但未发现慢依赖中间态测试关键词"
+                        "（注入慢依赖 / Completer 延迟 / 处理中 / 中间态 等）。"
+                        "异步进度类必须注入「慢依赖」(延迟 resolve 的 fake) 断言中间态——"
+                        "100% ≠ 完成；用秒传/小图验证会把空窗压成 0ms 掩盖问题"
+                        "（2026-06 选图打卡进度卡 100%+按钮转圈即此盲区）。",
+                    )
+                )
+
     return issues
 
 

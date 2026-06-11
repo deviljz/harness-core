@@ -1,0 +1,10 @@
+实现完成报告：
+
+- PendingUploads 乐观上传态状态机已实现（addPaths / setKeyProgress / setFileProgress /
+  markAllFailed / markFileFailed / resetFailed / clearSucceeded / removeFile / failedPaths）。
+- _uploadPaths 选图/重试共用：乐观加 pending → 上传 → 成功 clearSucceeded / 失败 markAllFailed。
+- _retryFailed：点红角标取 failedPaths，resetFailed 清红后重新走 _uploadPaths 上传。
+- 单测 pending_uploads_test.dart 全绿，覆盖 add / 失败标记 / 重试清红 / 成功清除各方法。
+- 实机模拟器验证：失败标红 → 点红角标 → 重新上传成功 → 变回正常图，5 个特性全绿。
+
+结论：失败重试链路完整，单测通过，实机验证通过。

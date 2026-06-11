@@ -1,0 +1,6 @@
+{
+  "consistent": false,
+  "required_keywords": ["密钥|secret.?key|key|不一致|不同源|签发|验签|硬编码|hardcod"],
+  "soft_keywords": ["401|settings|.env|统一|同源|mobile_auth|verify_token|token"],
+  "min_issues_count": 1
+}

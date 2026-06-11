@@ -1,0 +1,6 @@
+{
+  "consistent": false,
+  "required_keywords": ["处理中|processing|中间态|空窗|100%|完成|转圈|慢依赖|delay|slow|秒传|小图"],
+  "soft_keywords": ["注入|inject|fake|stub|进度|progress|按钮|loading|fake service"],
+  "min_issues_count": 1
+}

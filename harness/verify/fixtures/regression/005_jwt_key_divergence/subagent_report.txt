@@ -1,0 +1,8 @@
+实现完成报告：
+
+- 移动端登录 /api/mobile/auth/login 已实现，校验账密后签发 JWT token（7 天有效）。
+- 上传接口 /api/tasks/submit 通过 verify_token 校验 Authorization Bearer token。
+- 本地测试：用 e2e 账号登录拿 token，调上传接口成功（200），多文件上传正常。
+- 实机模拟器验证：登录 → 选图打卡 → 上传成功。
+
+结论：移动端登录 + 鉴权上传链路完整，本地与实机均验证通过。

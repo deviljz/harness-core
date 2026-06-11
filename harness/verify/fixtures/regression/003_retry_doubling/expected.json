@@ -1,0 +1,6 @@
+{
+  "consistent": false,
+  "required_keywords": ["重试|retry|重复|翻倍|累积|duplicat|addPaths|两次|2 ?份"],
+  "soft_keywords": ["连续|多轮|N ?轮|编排|orchestrat|resetFailed|不变量|invariant"],
+  "min_issues_count": 1
+}

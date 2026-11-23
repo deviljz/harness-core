@@ -2,10 +2,11 @@
 
 ## 任务分流与换班（HARNESS-ROUTING-v1）
 
-- **查因/调查类任务**（定位 bug、核查协议/日志/时序）：先按 `bug-investigation` 技能走 4 条轻护栏（默认只读、事实/推断/未验证分层、最小有界验证、落盘活结论），不直接大改业务代码。
+- **同一对话连做多条 bug / 多个 UI 微调 / 多个小功能**：按 `thin-orchestrator` 技能走**主线程薄总控 + 干净子 Agent 按单干活**，并用 `python -m harness task` 记录状态、硬校验改动文件与验收标准、防并行撞车，不要让主对话亲自啃大量日志撑爆上下文。
+- **查因/调查类任务**（定位 bug、核查协议/日志/时序）：按 `bug-investigation` 技能走 4 条轻护栏（默认只读、本机能验的自己验完、第一行给 3 秒定性、需改代码附 4 行修复包）。
 - **小步对照微调类**（UI/动效/QA 单点修复）：沿原流程改完立刻跑项目已有验证脚本或对照报告闭环，不为小改动写重型 Spec。
 - **新项目接入或整理项目入口**：使用 `codex-project-init` 技能，运行 `python -m harness init --agent codex --inspect-json` 自动扫描并维护 ≤40 行的薄项目 `AGENTS.md`，不把本文件里的全局规则重复抄进项目。
-- **换大话题 / 结项 / 明显鬼打墙时**：用 `long-task-handoff`（或 `python -m harness handoff`）刷完 1 页 4 栏状态文件（已验证事实 / 试过确认不行的路 / 未决项 / 下一步最小动作）再开干净新对话；同题密集讨论不强切。
+- **换大话题 / 跨天结项时**：用 `long-task-handoff`（或 `python -m harness handoff`）**覆写精简** 1 页 4 栏状态文件（严格 ≤60 行，禁止无限追加成流水账）；多条任务明细一律放 `python -m harness task`。
 
 ## BACKGROUND-COMPUTER-USE-v1
 

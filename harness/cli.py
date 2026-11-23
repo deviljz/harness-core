@@ -280,6 +280,14 @@ def doctor():
 
     # 本机 ~/.codex/ 同步状态检查
     if cfg.agent == "codex":
+        handoff_file = root / ".harness" / "handoff.md"
+        if handoff_file.is_file():
+            h_lines = len(handoff_file.read_text(encoding="utf-8", errors="replace").splitlines())
+            if h_lines > 80:
+                console.print(
+                    f"[yellow]! .harness/handoff.md has {h_lines} lines (建议 ≤60 行，覆写精简不要无限追加；"
+                    "多条任务请用 `python -m harness task`)[/yellow]"
+                )
         st = sync_status()
         if st["in_sync"]:
             console.print(f"[green]✓[/green] codex global sync: in sync ({st['codex_home']})")
@@ -404,6 +412,151 @@ def handoff_cmd(use_global: bool, reset: bool, show: bool, as_json: bool):
     console.print(f"[green]✓[/green] handoff ({tag}): {path}")
     if show:
         click.echo(path.read_text(encoding="utf-8"))
+
+
+# ════════════════════════════════════════════════════════════════════
+# task — 薄总控本地任务板（硬校验 + 防并行撞车 + 子 Agent 任务包）
+# ════════════════════════════════════════════════════════════════════
+
+
+def _resolve_task_root() -> Path:
+    try:
+        return _project_root(find_config())
+    except ConfigError:
+        return Path.cwd().resolve()
+
+
+@main.group("task", help="薄总控任务板：管理 bug/UI/功能单，硬校验改动范围与验收标准，防并行子 Agent 撞车")
+def task_group():
+    pass
+
+
+@task_group.command("add", help="登记一条任务单")
+@click.argument("task_id")
+@click.argument("title")
+@click.option("--kind", type=click.Choice(["bug", "ui", "feat", "other"], case_sensitive=False), default="bug", show_default=True)
+def task_add(task_id: str, title: str, kind: str):
+    from .adapters.codex import TaskValidationError, add_task
+
+    try:
+        item = add_task(_resolve_task_root(), task_id, title, kind=kind.lower())
+    except TaskValidationError as e:
+        err_console.print(f"[red]✗ {e}[/red]")
+        sys.exit(2)
+    console.print(f"[green]✓[/green] task added: {item['id']} ({item['kind']}) - {item['title']}")
+
+
+@task_group.command("update", help="更新任务结论/状态（need_fix 强制校验 files + verify + fact，fixing 强制防文件冲突）")
+@click.argument("task_id")
+@click.option("--title", type=str, default=None, help="标题（首次直接 update 建单时可选填）")
+@click.option("--kind", type=click.Choice(["bug", "ui", "feat", "other"], case_sensitive=False), default=None)
+@click.option("--status", type=click.Choice(["open", "fixing", "done", "skipped"], case_sensitive=False), default=None)
+@click.option("--verdict", type=click.Choice(["pending", "no_fix", "need_fix", "blocked_external", "done"], case_sensitive=False), default=None)
+@click.option("--fact", type=str, default=None, help="已核实事实（精确到文件:行号，≤400字）")
+@click.option("--files", type=str, default=None, help="改动文件边界，逗号分隔（verdict=need_fix 时必填）")
+@click.option("--verify", type=str, default=None, help="验收命令或通过标准（verdict=need_fix 时必填）")
+@click.option("--note", type=str, default=None, help="补充说明（verdict=blocked_external 时必填缺哪项外部条件）")
+@click.option("--owner", type=str, default=None, help="当前执行者（main / subagent / kimi 等）")
+@click.option("--force-collision", is_flag=True, help="显式忽略并行文件冲突告警（谨慎使用）")
+def task_update(
+    task_id: str,
+    title: str | None,
+    kind: str | None,
+    status: str | None,
+    verdict: str | None,
+    fact: str | None,
+    files: str | None,
+    verify: str | None,
+    note: str | None,
+    owner: str | None,
+    force_collision: bool,
+):
+    from .adapters.codex import TaskValidationError, update_task
+
+    try:
+        item = update_task(
+            _resolve_task_root(),
+            task_id,
+            title=title,
+            kind=kind.lower() if kind else None,
+            status=status.lower() if status else None,
+            verdict=verdict.lower() if verdict else None,
+            fact=fact,
+            files=files,
+            verify=verify,
+            note=note,
+            owner=owner,
+            force_collision=force_collision,
+        )
+    except TaskValidationError as e:
+        err_console.print(f"[red]✗ {e}[/red]")
+        sys.exit(2)
+    console.print(
+        f"[green]✓[/green] {item['id']} | status={item['status']} | verdict={item['verdict']} | "
+        f"files={','.join(item['files']) or '-'}"
+    )
+
+
+@task_group.command("list", help="列出紧凑任务总表")
+@click.option("--status", "filter_status", type=click.Choice(["all", "open", "fixing", "done", "skipped"], case_sensitive=False), default="all", show_default=True)
+@click.option("--json", "as_json", is_flag=True, help="输出 JSON")
+def task_list(filter_status: str, as_json: bool):
+    from .adapters.codex import load_tasks
+    from .adapters.codex.tasks import VERDICT_LABELS
+
+    data = load_tasks(_resolve_task_root())
+    items = data.get("items", [])
+    if filter_status.lower() != "all":
+        items = [it for it in items if it.get("status") == filter_status.lower()]
+    if as_json:
+        click.echo(json.dumps({"project": data.get("project"), "items": items}, ensure_ascii=False, indent=2))
+        return
+    if not items:
+        console.print("[dim]暂无任务单（用 `python -m harness task add <id> <title>` 登记）[/dim]")
+        return
+    for it in items:
+        v = VERDICT_LABELS.get(it.get("verdict", "pending"), it.get("verdict", ""))
+        files = ",".join(it.get("files") or []) or "-"
+        summary = (it.get("fact") or it.get("title") or "")[:72]
+        console.print(f"- [bold]{it['id']}[/bold] [{it['kind']}|{it['status']}|{v}] files={files} | {summary}")
+
+
+@task_group.command("show", help="查看单条任务详情")
+@click.argument("task_id")
+def task_show(task_id: str):
+    from .adapters.codex import load_tasks
+
+    data = load_tasks(_resolve_task_root())
+    key = task_id.strip().lower()
+    for it in data.get("items", []):
+        if str(it.get("id", "")).strip().lower() == key:
+            click.echo(json.dumps(it, ensure_ascii=False, indent=2))
+            return
+    err_console.print(f"[red]✗ 找不到任务: {task_id}[/red]")
+    sys.exit(2)
+
+
+@task_group.command("brief", help="生成可直接派给干净子 Agent 的精简任务包")
+@click.argument("task_id")
+@click.option("--mode", type=click.Choice(["auto", "investigate", "fix"], case_sensitive=False), default="auto", show_default=True)
+def task_brief(task_id: str, mode: str):
+    from .adapters.codex import TaskValidationError, build_subagent_brief
+
+    try:
+        text = build_subagent_brief(_resolve_task_root(), task_id, mode=mode.lower())
+    except TaskValidationError as e:
+        err_console.print(f"[red]✗ {e}[/red]")
+        sys.exit(2)
+    click.echo(text)
+
+
+@task_group.command("clear", help="清理已完成/跳过（或全部）任务单")
+@click.option("--all", "clear_all", is_flag=True, help="清空全部任务单（默认只清 done/skipped）")
+def task_clear(clear_all: bool):
+    from .adapters.codex import clear_tasks
+
+    n = clear_tasks(_resolve_task_root(), only_done=not clear_all)
+    console.print(f"[green]✓[/green] removed {n} task(s)")
 
 
 # ════════════════════════════════════════════════════════════════════

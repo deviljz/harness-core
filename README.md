@@ -31,9 +31,10 @@ python -m harness sync
 cd <your-project>
 python -m harness init --agent codex --inspect-json
 
-# 3. 体检、静态红线扫描、换班状态卡
+# 3. 体检、静态红线扫描、任务板（薄总控防撞车）、换班状态卡
 python -m harness doctor
 python -m harness check --warn-only
+python -m harness task list
 python -m harness handoff
 ```
 

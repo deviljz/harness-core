@@ -8,6 +8,10 @@ from pathlib import Path
 from click.testing import CliRunner
 
 from harness.adapters.codex import (
+    TaskValidationError,
+    add_task,
+    build_subagent_brief,
+    clear_tasks,
     codex_source_dir,
     ensure_handoff,
     init_codex_project,
@@ -16,6 +20,8 @@ from harness.adapters.codex import (
     pull_from_codex_home,
     sync_status,
     sync_to_codex_home,
+    tasks_md_path,
+    update_task,
 )
 from harness.cli import main
 from harness.config import AntiPatternRule, HarnessConfig
@@ -131,6 +137,7 @@ class TestCodexSync:
         skills = list_tracked_skills(src)
         assert "bug-investigation" in skills
         assert "codex-project-init" in skills
+        assert "thin-orchestrator" in skills
         assert "existing-flow-review" in skills
         assert "long-task-handoff" in skills
         # 不应包含 18MB 私人画图技能
@@ -197,3 +204,112 @@ class TestAntiPatternIncludeExcludeAndNewLangs:
         assert "game/Runtime/Foo.cs" in files
         assert "game/Editor/Bar.cs" not in files
         assert "server/lua/offline.lua" in files
+
+
+class TestTaskBoard:
+    def test_need_fix_enforces_files_verify_fact_and_blocks_file_collision(self, tmp_path: Path):
+        import pytest
+
+        add_task(tmp_path, "QA72", "英语环境出现中文提示", kind="bug")
+        add_task(tmp_path, "QA74", "回网不触发下载", kind="bug")
+
+        # need_fix 缺 files/verify/fact 必须拒收
+        with pytest.raises(TaskValidationError, match="--files"):
+            update_task(tmp_path, "QA72", verdict="need_fix")
+
+        # blocked_external 缺 note 必须拒收
+        with pytest.raises(TaskValidationError, match="blocked_external"):
+            update_task(tmp_path, "QA74", verdict="blocked_external")
+
+        # fact 超长必须拒收（防 30KB 流水账）
+        with pytest.raises(TaskValidationError, match="过长"):
+            update_task(tmp_path, "QA72", fact="x" * 450)
+
+        # 合法录入 QA72 并进入 fixing
+        update_task(
+            tmp_path,
+            "QA72",
+            verdict="need_fix",
+            status="fixing",
+            fact="SilentDownloadVM.cs:794 硬编码中文",
+            files="client/Assets/SilentDownloadVM.cs",
+            verify="切英语触发未初始化提示",
+            owner="subagent",
+        )
+
+        # QA74 想并行修改同一个文件 → 必须被防撞车硬拦截
+        with pytest.raises(TaskValidationError, match="并行文件冲突"):
+            update_task(
+                tmp_path,
+                "QA74",
+                verdict="need_fix",
+                status="fixing",
+                fact="SilentDownloadVM.cs:787 未初始化直接返回",
+                files="client/Assets/SilentDownloadVM.cs",
+                verify="断网过关回网触发真实 GET",
+            )
+
+        # QA72 完成后，QA74 才能进入 fixing
+        update_task(tmp_path, "QA72", status="done", verdict="done")
+        update_task(
+            tmp_path,
+            "QA74",
+            verdict="need_fix",
+            status="fixing",
+            fact="SilentDownloadVM.cs:787 未初始化直接返回",
+            files="client/Assets/SilentDownloadVM.cs",
+            verify="断网过关回网触发真实 GET",
+        )
+
+        # 自动渲染紧凑 1 页总表且生成子 Agent 任务包
+        md = tasks_md_path(tmp_path).read_text(encoding="utf-8")
+        assert "QA72" in md and "QA74" in md
+        brief = build_subagent_brief(tmp_path, "QA74")
+        assert "SilentDownloadVM.cs" in brief
+        assert "严禁越界修改范围外文件" in brief
+
+        removed = clear_tasks(tmp_path, only_done=True)
+        assert removed == 1
+
+    def test_cli_task_workflow(self, tmp_path: Path):
+        runner = CliRunner()
+        cwd = os.getcwd()
+        os.chdir(tmp_path)
+        try:
+            r1 = runner.invoke(main, ["task", "add", "UI-01", "优化商店入场动效", "--kind", "ui"])
+            assert r1.exit_code == 0, r1.output
+
+            # 缺字段应返回非 0 退出码
+            r_bad = runner.invoke(main, ["task", "update", "UI-01", "--verdict", "need_fix"])
+            assert r_bad.exit_code == 2
+
+            r2 = runner.invoke(
+                main,
+                [
+                    "task",
+                    "update",
+                    "UI-01",
+                    "--verdict",
+                    "need_fix",
+                    "--fact",
+                    "ShopPanel.cs:88 缺少 200ms 展开缓动",
+                    "--files",
+                    "game/client/Assets/Camp/Runtime/UI/ShopPanel.cs",
+                    "--verify",
+                    "跑 verify-camp-runtime.ps1 + 实拍帧对比",
+                ],
+            )
+            assert r2.exit_code == 0, r2.output
+
+            r_list = runner.invoke(main, ["task", "list", "--json"])
+            assert r_list.exit_code == 0
+            data = json.loads(r_list.output)
+            assert len(data["items"]) == 1
+            assert data["items"][0]["id"] == "UI-01"
+
+            r_brief = runner.invoke(main, ["task", "brief", "UI-01"])
+            assert r_brief.exit_code == 0
+            assert "ShopPanel.cs" in r_brief.output
+        finally:
+            os.chdir(cwd)
+

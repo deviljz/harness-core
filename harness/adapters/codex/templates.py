@@ -9,6 +9,8 @@ circuit_state.json
 review_data*.json
 review_prompt.md
 handoff.md
+tasks.json
+tasks.md
 reports/
 """
 

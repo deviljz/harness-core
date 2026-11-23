@@ -1,0 +1,4 @@
+interface:
+  display_name: "网页版还原到 Unity"
+  short_description: "对照可运行网页，验收 Unity 交互、静态样式和连续动效"
+  default_prompt: "用 $web-prototype-to-unity 对照正式网页版，修复 Unity 的界面、动效与交互，给出可复查的对比证据。"

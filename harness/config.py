@@ -76,6 +76,8 @@ class AntiPatternRule(BaseModel):
     msg: str = ""
     severity: str = "warn"  # "error" | "warn"
     multiline: bool = False
+    include: list[str] = Field(default_factory=list)
+    exclude: list[str] = Field(default_factory=list)
     case: Optional[str] = None  # 现场案例引用，文档用
 
 
@@ -98,6 +100,7 @@ class HarnessConfig(BaseModel):
     """顶层 config"""
     model_config = ConfigDict(extra="allow")
     project: str
+    agent: str = "codex"  # codex | claude
     llm: LLMConfig = Field(default_factory=LLMConfig)
     ignore_paths_global: list[str] = Field(default_factory=list)
     trigger_on_edit_paths: list[str] = Field(default_factory=list)

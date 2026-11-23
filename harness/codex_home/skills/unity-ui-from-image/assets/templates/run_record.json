@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "run_id": "",
+  "contract_id": "",
+  "input_file": "",
+  "input_sha256": "",
+  "prompt_file": "",
+  "prompt_sha256": "",
+  "template_version": "",
+  "model": {
+    "provider": "",
+    "model_id": "",
+    "version_or_checked_date": "",
+    "requested_settings": {},
+    "actual_settings": {},
+    "seed": null
+  },
+  "attempt_index": 1,
+  "experiment_retry_limit": null,
+  "experiment_cost_limit": null,
+  "output_files": [],
+  "output_hashes": {},
+  "processing": {
+    "module_version": null,
+    "parameters": {},
+    "manual_repair": false
+  },
+  "checks": [],
+  "metrics": {},
+  "decision": "not_run",
+  "failure_types": [],
+  "failure_regions": [],
+  "time_seconds": null,
+  "actual_cost": null,
+  "reviewer": null,
+  "notes": "Unknown fields remain null, never inferred as observed."
+}

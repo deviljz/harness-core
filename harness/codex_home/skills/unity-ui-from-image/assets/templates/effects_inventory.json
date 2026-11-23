@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "source": "",
+  "evidence": [],
+  "classification_options": [
+    "static_material",
+    "independent_effect",
+    "uncertain"
+  ],
+  "effects": [],
+  "entry_fields": {
+    "id": "",
+    "classification": "",
+    "evidence": "",
+    "confidence": "",
+    "design_status": "confirmed_or_trial_assumption",
+    "owner": "",
+    "draw_order": "",
+    "clean_base": "",
+    "implementation": "",
+    "parameters": {},
+    "clock": "",
+    "trigger": "",
+    "stop": "",
+    "restore": "",
+    "blend": "",
+    "clip": "",
+    "input_policy": "nonblocking_unless_explicitly_interactive",
+    "validation": {
+      "clean_base": false,
+      "timeline": false,
+      "lifecycle": false,
+      "clipping": false,
+      "real_playback": false
+    }
+  }
+}

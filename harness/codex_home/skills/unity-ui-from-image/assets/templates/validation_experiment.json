@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "status": "planned_not_executed",
+  "training_examples": [],
+  "held_out_examples": [],
+  "repeats_per_example": null,
+  "profiles_to_compare": [],
+  "thresholds_approved": false,
+  "retry_limit": null,
+  "cost_limit": null,
+  "report_all_attempts": true,
+  "exclude_manual_repairs_from_automatic_pass_rate": true
+}

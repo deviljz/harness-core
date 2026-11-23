@@ -1,0 +1,3 @@
+interface:
+  display_name: "Windows 性能排查"
+  short_description: "有界采样定位整机卡顿与后台 Git 负载，验证可逆调整并保留正常功能"

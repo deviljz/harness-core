@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "producer_id": "实际制作agent或会话ID",
+  "stages": {
+    "sample": {
+      "inputs": [
+        "design.json",
+        "assets.json"
+      ],
+      "reference": "reference.png",
+      "candidate": "sample.png",
+      "render_inputs": null,
+      "required_text_checks": null,
+      "checks": [
+        "sample_checks.json"
+      ],
+      "criteria": [
+        "完整组件与必留项；跨页组件核对复用入口及允许的差异",
+        "当前状态及遮挡；相似状态逐对核对区分它们的操作或标志",
+        "主体大小与文字或插画效果"
+      ],
+      "requirements": [
+        "根据本次任务填写，不放制作者自评"
+      ],
+      "packet": "review/sample/request.json",
+      "review": "review/sample/result.json"
+    },
+    "final": {
+      "inputs": [
+        "final.prefab",
+        "runtime.cs",
+        "state.json"
+      ],
+      "reference": "reference.png",
+      "candidate": "final.png",
+      "render_inputs": null,
+      "required_text_checks": null,
+      "checks": [
+        "final_checks.json"
+      ],
+      "criteria": [
+        "完整组件与必留项；跨页组件核对复用入口及允许的差异",
+        "当前状态及遮挡；相似状态逐对核对区分它们的操作或标志",
+        "主体大小与文字或插画效果"
+      ],
+      "requirements": [
+        "根据本次任务填写，不放制作者自评"
+      ],
+      "packet": "review/final/request.json",
+      "review": "review/final/result.json"
+    }
+  }
+}

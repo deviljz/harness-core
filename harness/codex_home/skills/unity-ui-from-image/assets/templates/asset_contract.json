@@ -1,0 +1,60 @@
+{
+  "schema_version": 2,
+  "contract_id": "",
+  "design_version": "",
+  "status": "draft",
+  "fidelity_mode": "choose_exact_or_approx_ui_ready",
+  "layout_contract_file": "",
+  "layout_contract_sha256": "",
+  "assembly_status": "not_checked",
+  "art_status": "not_final",
+  "reference": {
+    "file": "",
+    "sha256": "",
+    "working_size": [],
+    "canvas_size": []
+  },
+  "assets": [
+    {
+      "id": "",
+      "screen_id": "",
+      "parent_id": "",
+      "role": "sprite",
+      "shared_asset_id": "",
+      "alpha_class": "soft_edge",
+      "required_independent_parts": [],
+      "required_states": [],
+      "material_regions": [
+        {
+          "id": "",
+          "alpha_class": "",
+          "mask_file": null,
+          "mask_source": "unverified",
+          "recovery_policy": "unverified"
+        }
+      ],
+      "text_policy": "separate_static_or_dynamic",
+      "allowed_inpaint_regions": [],
+      "geometry_status": "unverified",
+      "approval_status": "pending",
+      "content_rect": [],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "display_rects": [],
+      "building_type": null,
+      "view": null,
+      "footprint": null,
+      "source_method": "",
+      "assembly_ready": false,
+      "art_final": false,
+      "polish_issues": []
+    }
+  ],
+  "thresholds": {
+    "status": "uncalibrated",
+    "per_asset_class": {},
+    "approved_by": null
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "scope": "Project-specific values must be decided before generation and composition.",
+  "fidelity_mode": "exact_or_approx_ui_ready",
+  "typography": [
+    {
+      "node_id": "",
+      "font_family_and_source": "",
+      "weight_or_same_color_outline": "",
+      "font_size_range": [],
+      "text_rect": [],
+      "alignment": "",
+      "overflow_policy": "",
+      "native_material_persistence_check": "",
+      "minimum_screen_and_changed_text_evidence": []
+    }
+  ],
+  "features": [
+    {
+      "id": "",
+      "owner": "",
+      "source_evidence": "",
+      "must_keep": [],
+      "may_change": [],
+      "unknowns": [],
+      "decision_and_reason": "",
+      "method_coverage": [],
+      "check": "",
+      "expected_value_and_tolerance": null,
+      "root_stage_and_record": ""
+    }
+  ],
+  "series": [
+    {
+      "id": "",
+      "asset_ids": [],
+      "logical_units": [],
+      "visible_body_rects": [],
+      "structure_landmarks": [],
+      "frame_width_and_tolerance": null,
+      "joint_policy": "",
+      "minimum_display_sizes": [],
+      "allowed_fit_modes": [],
+      "acceptance_evidence": []
+    }
+  ],
+  "review_statuses": {
+    "automated_checks": "not_run",
+    "visual_review": "not_run",
+    "user_decision": "pending",
+    "target_engine": "not_tested"
+  },
+  "execution_evidence": {
+    "state_design_before_assembly": {
+      "status": "not_checked",
+      "evidence": []
+    },
+    "complete_component_before_batch": {
+      "status": "not_checked",
+      "evidence": []
+    },
+    "representative_text_before_batch": {
+      "status": "not_checked",
+      "evidence": []
+    },
+    "final_same_state_and_overlays": {
+      "status": "not_checked",
+      "prefab_sha256": "",
+      "evidence": []
+    }
+  }
+}

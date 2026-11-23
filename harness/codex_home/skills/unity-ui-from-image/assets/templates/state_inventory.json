@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "stage": "0",
+  "design_version": "",
+  "source_references": [],
+  "scope": "",
+  "review_status": "not_started",
+  "design_status": "pending_confirmation",
+  "art_coverage_status": "not_checked",
+  "controls": [
+    {
+      "id": "",
+      "observed_evidence": "",
+      "inferred_role": "",
+      "role_confirmed": false,
+      "shared_rule_ref": null,
+      "states": [
+        {
+          "id": "",
+          "evidence_status": "unknown",
+          "entry_condition": null,
+          "visual": null,
+          "interaction": null,
+          "exit_condition": null,
+          "decision_status": "pending_confirmation",
+          "decision_source": null,
+          "question_ids": [],
+          "art_requirement": "unknown_or_parameters_or_local_art_or_full_screen",
+          "evidence_ids": [],
+          "verification_status": "not_checked",
+          "linked_control_ids": []
+        }
+      ],
+      "relevant_combinations": [],
+      "not_applicable": []
+    }
+  ],
+  "questions": [
+    {
+      "id": "",
+      "priority": "",
+      "control_ids": [],
+      "question": "",
+      "recommendation": null,
+      "impact": "",
+      "answer": null,
+      "evidence_ids": [],
+      "status": "unanswered",
+      "remaining": null,
+      "blocks_current_scope": null,
+      "next_step": null,
+      "impact_on_art": null
+    }
+  ],
+  "art_requests": [
+    {
+      "id": "",
+      "control_ids": [],
+      "state_ids": [],
+      "reference": null,
+      "confirmed_requirements": [],
+      "design_proposals": [],
+      "keep": [],
+      "hide": [],
+      "change": [],
+      "layout_and_interaction": "",
+      "copy": {
+        "text": null,
+        "status": "not_defined"
+      },
+      "deliverable": "",
+      "acceptance_criteria": [],
+      "evidence_ids": [],
+      "status": "not_started"
+    }
+  ],
+  "deferred_with_reason": [],
+  "limitations": [],
+  "prototype_verification_status": "not_checked",
+  "evidence": [],
+  "decisions_to_confirm": [],
+  "issues_and_roots": [],
+  "confirmation_records": [],
+  "art_brief_status": "not_prepared",
+  "program_handoff_status": "not_ready",
+  "art_deliverables": [],
+  "layout_and_interaction_notes": [],
+  "business_details_deferred": []
+}

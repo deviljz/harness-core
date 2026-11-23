@@ -1,0 +1,4 @@
+interface:
+  display_name: "UI 流程反馈复盘"
+  short_description: "汇总多项目的使用反馈，核查诊断，选择测试用例并跟踪剩余问题"
+  default_prompt: "使用 $ui-feedback-iteration 复盘这批 UI 使用反馈，核查上次判断，列出整轮问题和下一项值得验证的改动。"

@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "harness-core"
-version = "0.4.0"
-description = "AI-assisted development harness: plan/execute/review/validate lifecycle"
+version = "0.5.0"
+description = "AI-assisted development harness (Codex-first lightweight workflow + multi-PC sync)"
 authors = [{ name = "jinzhe" }]
 readme = "README.md"
 requires-python = ">=3.11"
@@ -37,6 +37,7 @@ exclude = ["tests*"]
 [tool.setuptools.package-data]
 "harness.review" = ["prompt_template.md"]
 "harness.adapters.claude_code" = ["commands/*.md"]
+"harness.codex_home" = ["AGENTS.md", "skills/**/*"]
 # skill 资源（SKILL.md 等）：必须显式声明，否则 wheel 不打包，
 # pip install 后 .claude/skills/<name>/ 缺 SKILL.md，
 # Claude Code 识别不到 skill（识别靠 SKILL.md frontmatter），

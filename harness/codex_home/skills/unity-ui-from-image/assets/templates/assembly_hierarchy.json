@@ -1,0 +1,26 @@
+{
+  "source_prefab": "",
+  "output_prefab": "",
+  "output_scene": "",
+  "reference_size": [0, 0],
+  "tested_ratio_range": "Specify the approved portrait/landscape ratio range",
+  "sizing_policy": "State fixed areas, flexible areas, uniform scaling, gaps and small-screen fallback",
+  "rules": [],
+  "cases": [],
+  "rule_fields": {
+    "id": "Stable source-node ID or new group ID",
+    "parent": "Owning group ID; empty for Canvas root",
+    "name": "Readable hierarchy name",
+    "rect": "Reference x,y,width,height in top-left coordinates",
+    "mode": "normalized | top | bottom | middle | aspect_fit | column | safe_area | stretch",
+    "source": "true for an existing imported node; false for a new group",
+    "order": "Sibling draw order",
+    "related_to": "Optional owner ID when a state overlay cannot share the owner's direct parent"
+  },
+  "case_fields": {
+    "id": "Unique case name",
+    "width": "Screen pixels",
+    "height": "Screen pixels",
+    "insets": "Simulated safe-area insets [left,top,right,bottom]; never global device constants"
+  }
+}

@@ -21,15 +21,24 @@ pip install -e .
 
 安装后 `harness` 命令在 PATH 里可用。
 
-## 快速开始
+## 快速开始（Codex 轻量模式，默认）
 
-```bash
+```powershell
+# 1. 在新电脑上同步全局铁律 + 通用工程 Skill 到 ~/.codex/（自动备份旧文件，不碰私人 Skill）
+python -m harness sync
+
+# 2. 在具体项目根目录初始化（生成薄 AGENTS.md + .harness/config.yaml + 4 栏换班卡，支持 Agent 自助调用）
 cd <your-project>
-harness init         # 生成 .harness/ 骨架
-# 编辑 .harness/config.yaml 填 target
-harness doctor       # 诊断接入是否正确
-harness check        # 手动跑一次
+python -m harness init --agent codex --inspect-json
+
+# 3. 体检、静态红线扫描、换班状态卡
+python -m harness doctor
+python -m harness check --warn-only
+python -m harness handoff
 ```
+
+> 在本机修改了 `~/.codex/AGENTS.md` 或通用 Skill 后，回 `harness-core` 目录运行 `python -m harness sync --pull` 即可回拉进仓库提交。
+> 如需旧版 Claude Code hook 模式：`python -m harness init --agent claude`。
 
 ## 设计文档
 

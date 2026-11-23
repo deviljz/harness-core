@@ -34,17 +34,72 @@ def main():
 # ════════════════════════════════════════════════════════════════════
 
 
-@main.command(help="在当前项目生成 .harness/ 骨架 + 装 hook")
+@main.command(help="初始化当前项目（默认 Codex 轻量模式：薄 AGENTS.md + .harness/config.yaml + 4 栏换班卡）")
+@click.option(
+    "--agent",
+    type=click.Choice(["codex", "claude"], case_sensitive=False),
+    default="codex",
+    show_default=True,
+    help="目标 Agent 适配层（codex 轻量模式 | claude 经典 hook 模式）",
+)
+@click.option("--inspect-json", is_flag=True, help="Codex 模式：输出结构化 JSON（供 Agent 自主完成初始化）")
+@click.option("--force-agents", is_flag=True, help="Codex 模式：强制覆盖已有 AGENTS.md（默认保留）")
+@click.option("--no-handoff", is_flag=True, help="Codex 模式：跳过生成 .harness/handoff.md 模板")
 @click.option("--force", is_flag=True, help="强制覆盖框架文件（run_hook.py + commands）；不动 config.yaml")
 @click.option("--reset-config", is_flag=True, help="显式重置 config.yaml 到默认模板（危险：丢 targets 等所有用户配置）")
-@click.option("--local", is_flag=True, help="hook 写入 .claude/settings.local.json（不入 git）")
-@click.option("--no-hooks", is_flag=True, help="跳过 Claude Code hook 安装")
-@click.option("--with-gate", is_flag=True, help="额外装 Stop hook（每轮对话结束跑 --gate）；默认不装避免在没改代码的对话中也触发全量")
-@click.option("--pre-commit", is_flag=True, help="额外装 git pre-commit hook（提交前跑 harness check 拦红）；适合无 Claude Code auto-hook 的工具/CI（可配 --no-hooks 用）")
-def init(force: bool, reset_config: bool, local: bool, no_hooks: bool, with_gate: bool, pre_commit: bool):
+@click.option("--local", is_flag=True, help="Claude 模式：hook 写入 .claude/settings.local.json（不入 git）")
+@click.option("--no-hooks", is_flag=True, help="Claude 模式：跳过 Claude Code hook 安装")
+@click.option("--with-gate", is_flag=True, help="Claude 模式：额外装 Stop hook（每轮对话结束跑 --gate）")
+@click.option("--pre-commit", is_flag=True, help="额外装 git pre-commit hook（提交前跑 harness check 拦红）")
+def init(
+    agent: str,
+    inspect_json: bool,
+    force_agents: bool,
+    no_handoff: bool,
+    force: bool,
+    reset_config: bool,
+    local: bool,
+    no_hooks: bool,
+    with_gate: bool,
+    pre_commit: bool,
+):
+    cwd = Path.cwd()
+
+    if agent.lower() == "codex":
+        from .adapters.codex import init_codex_project
+
+        result = init_codex_project(
+            cwd,
+            force_agents=force_agents,
+            reset_config=reset_config,
+            create_handoff=not no_handoff,
+        )
+        if pre_commit:
+            from .adapters.generic import install_precommit_hook
+
+            hook = install_precommit_hook(cwd)
+            if hook:
+                result["created"].append(".git/hooks/pre-commit")
+            else:
+                result["warnings"].append("pre-commit 跳过：非 git 仓库，或已有非 harness 的 pre-commit")
+
+        if inspect_json:
+            click.echo(json.dumps(result, ensure_ascii=False, indent=2))
+            return
+
+        for rel in result["created"]:
+            console.print(f"[green]✓[/green] created: {rel}")
+        for rel in result["preserved"]:
+            console.print(f"[dim]• preserved: {rel}[/dim]")
+        for warn in result["warnings"]:
+            console.print(f"[yellow]! {warn}[/yellow]")
+        console.print("\nNext steps:")
+        for idx, step in enumerate(result["next_steps"], 1):
+            console.print(f"  {idx}. {step}")
+        return
+
     from .adapters.claude_code import install_hooks
 
-    cwd = Path.cwd()
     harness_dir = cwd / ".harness"
     harness_dir.mkdir(exist_ok=True)
 
@@ -187,8 +242,9 @@ gate:
 # ════════════════════════════════════════════════════════════════════
 
 
-@main.command(help="诊断：config / hook / platform")
+@main.command(help="诊断：config / AGENTS.md / Codex 全局同步 / platform")
 def doctor():
+    from .adapters.codex import sync_status
     from .router import _IS_WINDOWS
 
     try:
@@ -196,23 +252,158 @@ def doctor():
     except ConfigError as e:
         err_console.print(f"[red]✗ config load failed: {e}[/red]")
         sys.exit(1)
-    console.print(f"[green]✓[/green] config: project={cfg.project}")
+    console.print(f"[green]✓[/green] config: project={cfg.project} (agent={cfg.agent})")
     console.print(f"[green]✓[/green] llm: {cfg.llm.provider}")
     console.print(f"[green]✓[/green] platform: {'windows' if _IS_WINDOWS else 'unix'}")
     console.print(f"[green]✓[/green] targets: {len(cfg.targets)}")
     for t in cfg.targets:
         console.print(f"    - {t.name} ({t.language}, root={t.root})")
-    if not cfg.targets:
-        console.print("[yellow]! no targets configured yet[/yellow]")
+    if not cfg.targets and not cfg.anti_patterns:
+        console.print("[yellow]! no targets or anti_patterns configured yet[/yellow]")
+    elif cfg.anti_patterns:
+        n_rules = sum(len(v) for v in cfg.anti_patterns.values())
+        console.print(f"[green]✓[/green] anti_patterns: {n_rules} rule(s) across {len(cfg.anti_patterns)} lang group(s)")
 
-    # skipped log 提醒
     cfg_path = find_config()
     root = _project_root(cfg_path)
+
+    # 项目薄 AGENTS.md 体检
+    agents_md = root / "AGENTS.md"
+    if agents_md.is_file():
+        n_lines = len(agents_md.read_text(encoding="utf-8", errors="replace").splitlines())
+        if n_lines <= 60:
+            console.print(f"[green]✓[/green] AGENTS.md: {n_lines} lines")
+        else:
+            console.print(f"[yellow]! AGENTS.md has {n_lines} lines (建议保持 ≤40 行入口地图，防膨胀)[/yellow]")
+    elif cfg.agent == "codex":
+        console.print("[yellow]! AGENTS.md missing (运行 `python -m harness init --agent codex` 生成薄入口)[/yellow]")
+
+    # 本机 ~/.codex/ 同步状态检查
+    if cfg.agent == "codex":
+        st = sync_status()
+        if st["in_sync"]:
+            console.print(f"[green]✓[/green] codex global sync: in sync ({st['codex_home']})")
+        else:
+            drifted = []
+            if st["agents"] != "in_sync":
+                drifted.append(f"AGENTS.md({st['agents']})")
+            for sk, sv in st["skills"].items():
+                if sv != "in_sync":
+                    drifted.append(f"skills/{sk}({sv})")
+            console.print(
+                f"[yellow]! codex global sync drifted ({', '.join(drifted[:4])}); "
+                "run `python -m harness sync`[/yellow]"
+            )
+
+    # skipped log 提醒
     skipped = root / "skipped.log"
     if skipped.exists():
         lines = skipped.read_text(encoding="utf-8").strip().splitlines()
         if len(lines) > 3:
             console.print(f"[yellow]! skipped.log has {len(lines)} entries; review with `harness reports`[/yellow]")
+
+
+# ════════════════════════════════════════════════════════════════════
+# sync — 多机同步 ~/.codex/ 全局铁律与通用工程 Skill
+# ════════════════════════════════════════════════════════════════════
+
+
+@main.command("sync", help="同步 harness-core 中的全局 AGENTS.md 与通用工程 Skill 到本机 ~/.codex/（或 --pull 回拉）")
+@click.option("--pull", is_flag=True, help="反向回拉：从本机 ~/.codex/ 拉回已追踪文件到 harness/codex_home/ 以便 git 提交")
+@click.option("--status", "show_status", is_flag=True, help="只检查是否一致，不改任何文件")
+@click.option("--dry-run", is_flag=True, help="预览变更，不落盘")
+@click.option(
+    "--only",
+    type=click.Choice(["all", "agents", "skills"], case_sensitive=False),
+    default="all",
+    show_default=True,
+    help="同步范围",
+)
+@click.option("--codex-home", type=click.Path(path_type=Path), default=None, help="显式指定 Codex 配置目录（默认 $CODEX_HOME 或 ~/.codex）")
+@click.option("--json", "as_json", is_flag=True, help="输出 JSON")
+def sync_cmd(
+    pull: bool,
+    show_status: bool,
+    dry_run: bool,
+    only: str,
+    codex_home: Path | None,
+    as_json: bool,
+):
+    from .adapters.codex import pull_from_codex_home, sync_status, sync_to_codex_home
+
+    if show_status:
+        st = sync_status(codex_home=codex_home)
+        if as_json:
+            click.echo(json.dumps(st, ensure_ascii=False, indent=2))
+        else:
+            icon = "[green]✓[/green]" if st["in_sync"] else "[yellow]![/yellow]"
+            console.print(f"{icon} codex_home: {st['codex_home']}")
+            console.print(f"  AGENTS.md: {st['agents']}")
+            for sk, sv in st["skills"].items():
+                console.print(f"  skills/{sk}: {sv}")
+        if not st["in_sync"]:
+            sys.exit(1)
+        return
+
+    if pull:
+        res = pull_from_codex_home(codex_home=codex_home, only=only.lower(), dry_run=dry_run)
+    else:
+        res = sync_to_codex_home(codex_home=codex_home, only=only.lower(), dry_run=dry_run)
+
+    if as_json:
+        click.echo(json.dumps(res, ensure_ascii=False, indent=2))
+        return
+
+    prefix = r"\[dry-run] " if dry_run else ""
+    console.print(f"{prefix}[bold]{res['direction']}[/bold] ({res['codex_home']})")
+    for item in res["updated"]:
+        console.print(f"  [green]✓ updated:[/green] {item}")
+    for bak in res.get("backups", []):
+        console.print(f"  [dim]backup saved: {bak}[/dim]")
+    if res["unchanged"]:
+        console.print(f"  [dim]unchanged ({len(res['unchanged'])}): {', '.join(res['unchanged'][:6])}"
+                      f"{' ...' if len(res['unchanged']) > 6 else ''}[/dim]")
+    for miss in res.get("skipped_missing", []):
+        console.print(f"  [yellow]! missing in codex_home:[/yellow] {miss}")
+
+
+# ════════════════════════════════════════════════════════════════════
+# handoff — 1 页 4 栏换班状态卡
+# ════════════════════════════════════════════════════════════════════
+
+
+@main.command("handoff", help="定位或初始化当前项目的 1 页 4 栏换班状态卡（不污染项目 git）")
+@click.option("--global", "use_global", is_flag=True, help="存放到 ~/.codex/handoffs/<project-key>/current.md")
+@click.option("--reset", is_flag=True, help="重置为空白 4 栏模板")
+@click.option("--show", is_flag=True, help="直接打印当前换班状态卡内容")
+@click.option("--json", "as_json", is_flag=True, help="输出 JSON")
+def handoff_cmd(use_global: bool, reset: bool, show: bool, as_json: bool):
+    from .adapters.codex import ensure_handoff, project_key
+
+    try:
+        root = _project_root(find_config())
+    except ConfigError:
+        root = Path.cwd().resolve()
+
+    path, created = ensure_handoff(root, use_global=use_global, reset=reset)
+    if as_json:
+        click.echo(
+            json.dumps(
+                {
+                    "path": path.as_posix(),
+                    "created": created,
+                    "project_key": project_key(root),
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        return
+
+    tag = "created" if created else "ready"
+    console.print(f"[green]✓[/green] handoff ({tag}): {path}")
+    if show:
+        click.echo(path.read_text(encoding="utf-8"))
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -464,7 +655,12 @@ def check(on_edit, gate_mode, dry_run, warn_only, skip_gate, reason):
 
     cfg_path = find_config()
     root = _project_root(cfg_path)
-    reports_dir = root / "reports"
+    # Codex 模式下若项目根没有 reports/，默认写进 .harness/reports/（被 .harness/.gitignore 忽略，不污染项目根目录）
+    reports_dir = (
+        root / ".harness" / "reports"
+        if cfg.agent == "codex" and not (root / "reports").exists()
+        else root / "reports"
+    )
 
     # ── Gate 模式 ─────────────────────────────────────────────
     if gate_mode:
@@ -577,9 +773,15 @@ def resume(ts: str | None):
 @main.command(help="列最近 N 次报告")
 @click.option("-n", "count", type=int, default=10)
 def reports(count: int):
+    cfg = load_config()
     cfg_path = find_config()
     root = _project_root(cfg_path)
-    reports_dir = root / "reports"
+    # Codex 模式下若项目根没有 reports/，默认写进 .harness/reports/（被 .harness/.gitignore 忽略，不污染项目根目录）
+    reports_dir = (
+        root / ".harness" / "reports"
+        if cfg.agent == "codex" and not (root / "reports").exists()
+        else root / "reports"
+    )
     if not reports_dir.exists():
         console.print("[dim]no reports/ yet[/dim]")
         return

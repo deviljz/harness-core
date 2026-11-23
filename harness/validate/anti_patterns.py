@@ -31,12 +31,21 @@ EXT_TO_LANG: dict[str, str] = {
     ".tsx": "typescript",
     ".js": "javascript",
     ".jsx": "javascript",
+    ".cjs": "javascript",
+    ".mjs": "javascript",
     ".go": "go",
     ".rs": "rust",
     ".java": "java",
     ".kt": "kotlin",
     ".swift": "swift",
     ".cs": "csharp",  # 包括 Unity 工程，规则在 config.yaml anti_patterns.csharp 下沉淀
+    ".lua": "lua",
+    ".ps1": "powershell",
+    ".cpp": "cpp",
+    ".cc": "cpp",
+    ".cxx": "cpp",
+    ".h": "cpp",
+    ".hpp": "cpp",
 }
 
 
@@ -49,18 +58,30 @@ class AntiPatternFinding:
     severity: str  # "error" | "warn"
 
 
-def scan_file(file_path: Path, rules: list[AntiPatternRule], project_root: Path) -> list[AntiPatternFinding]:
-    """扫描单个文件。"""
-    if not file_path.is_file():
+def scan_file(
+    file_path: Path,
+    rules: list[AntiPatternRule],
+    project_root: Path,
+    *,
+    rel_posix: str | None = None,
+) -> list[AntiPatternFinding]:
+    """扫描单个文件（先按 include/exclude 过滤规则，命中规则为空时不读盘）。"""
+    rel = rel_posix if rel_posix is not None else _relative(file_path, project_root)
+    active_rules = [
+        rule
+        for rule in rules
+        if (not rule.include or _is_ignored(rel, rule.include))
+        and (not rule.exclude or not _is_ignored(rel, rule.exclude))
+    ]
+    if not active_rules or not file_path.is_file():
         return []
     try:
         content = file_path.read_text(encoding="utf-8", errors="replace")
     except Exception:
         return []
 
-    rel = _relative(file_path, project_root)
     findings: list[AntiPatternFinding] = []
-    for rule in rules:
+    for rule in active_rules:
         flags = re.MULTILINE
         if rule.multiline:
             flags |= re.DOTALL
@@ -89,14 +110,24 @@ def _relative(p: Path, project_root: Path) -> str:
 
 
 def _is_ignored(rel_posix: str, ignore_patterns: list[str]) -> bool:
-    """检查相对路径（posix）是否匹配任意 ignore glob 模式。"""
+    """检查相对路径（posix）是否匹配任意 glob 模式（支持 `dir/**`、`**/dir/**` 与 `dir/**/*.ext`）。"""
+    from pathlib import PurePosixPath
+
+    p = PurePosixPath(rel_posix)
     for pat in ignore_patterns:
         if fnmatch.fnmatch(rel_posix, pat):
+            return True
+        if p.match(pat):
             return True
         # 支持 "scripts/**" 形式：也匹配 "scripts/foo.py"
         if pat.endswith("/**"):
             prefix = pat[:-3]
             if rel_posix == prefix or rel_posix.startswith(prefix + "/"):
+                return True
+        # 支持 "prefix/**/suffix" 在零层目录时也能命中（如 "a/b.cs" 匹配 "a/**/*.cs"）
+        if "/**/" in pat:
+            collapsed = pat.replace("/**/", "/")
+            if fnmatch.fnmatch(rel_posix, collapsed):
                 return True
     return False
 
@@ -111,28 +142,34 @@ def _rules_for_file(file_path: Path, anti_patterns: dict[str, list[AntiPatternRu
     return rules
 
 
-def _iter_tracked_files(project_root: Path) -> Iterable[Path]:
-    """全量扫描时迭代 git tracked 文件。无 git 时 fallback 到 rglob。"""
+def _iter_tracked_files(project_root: Path) -> Iterable[tuple[Path, str]]:
+    """全量扫描时迭代 git tracked 文件，返回 `(绝对路径, posix相对路径)` 避免每文件重复 resolve()。"""
     import subprocess
 
+    root = project_root.resolve()
     try:
         out = subprocess.run(
-            ["git", "ls-files"],
-            cwd=project_root,
+            ["git", "-c", "core.quotepath=false", "ls-files"],
+            cwd=root,
             check=True,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
         )
-        for line in out.stdout.splitlines():
-            p = project_root / line.strip()
-            if p.suffix.lower() in EXT_TO_LANG and p.exists():
-                yield p
+        for raw_line in out.stdout.splitlines():
+            rel = raw_line.strip().replace("\\", "/")
+            if not rel:
+                continue
+            ext = Path(rel).suffix.lower()
+            if ext in EXT_TO_LANG:
+                yield root / rel, rel
     except Exception:
         for ext in EXT_TO_LANG:
-            for p in project_root.rglob(f"*{ext}"):
+            for p in root.rglob(f"*{ext}"):
                 if any(part in {".git", "node_modules", ".dart_tool", "build", "dist", "vendor"} for part in p.parts):
                     continue
-                yield p
+                yield p, _relative(p, root)
 
 
 def run_anti_patterns(
@@ -166,13 +203,12 @@ def run_anti_patterns(
             if rules and p.exists():
                 findings.extend(scan_file(p, rules, project_root))
     else:
-        for p in _iter_tracked_files(project_root):
-            rel = _relative(p, project_root)
+        for p, rel in _iter_tracked_files(project_root):
             if _is_ignored(rel, ignore):
                 continue
             rules = _rules_for_file(p, config.anti_patterns)
             if rules:
-                findings.extend(scan_file(p, rules, project_root))
+                findings.extend(scan_file(p, rules, project_root, rel_posix=rel))
 
     errors = [f for f in findings if f.severity == "error"]
     warns = [f for f in findings if f.severity == "warn"]

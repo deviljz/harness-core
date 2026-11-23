@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "reference": "reference.png",
+  "candidates": {
+    "before": "before.png",
+    "candidate": "candidate.png"
+  },
+  "output": "metric_evidence",
+  "settings": {
+    "ssim_window": 7,
+    "minimum_pixels": 64,
+    "minimum_ssim_centers": 25,
+    "canny_low": 40,
+    "canny_high": 100
+  },
+  "regions": [],
+  "instructions": "Fill source-observed rect [x,y,w,h], optional include_rects/exclude_rects in source coordinates, notes. Freeze before comparison. Settings are measurement parameters, not quality thresholds. Opaque composites at equal dimensions only."
+}

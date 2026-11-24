@@ -451,7 +451,7 @@ def task_add(task_id: str, title: str, kind: str):
 @click.option("--title", type=str, default=None, help="标题（首次直接 update 建单时可选填）")
 @click.option("--kind", type=click.Choice(["bug", "ui", "feat", "other"], case_sensitive=False), default=None)
 @click.option("--status", type=click.Choice(["open", "fixing", "done", "skipped"], case_sensitive=False), default=None)
-@click.option("--verdict", type=click.Choice(["pending", "no_fix", "need_fix", "blocked_external", "done"], case_sensitive=False), default=None)
+@click.option("--verdict", type=click.Choice(["pending", "no_fix", "need_fix", "fixed_pending_qa", "blocked_external", "done"], case_sensitive=False), default=None)
 @click.option("--fact", type=str, default=None, help="已核实事实（精确到文件:行号，≤400字）")
 @click.option("--files", type=str, default=None, help="改动文件边界，逗号分隔（verdict=need_fix 时必填）")
 @click.option("--verify", type=str, default=None, help="验收命令或通过标准（verdict=need_fix 时必填）")

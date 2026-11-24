@@ -27,12 +27,14 @@ description: 在同一个主对话里连续处理多个 bug、UI 微调或小功
    python -m harness task add QA72 "英语环境下出现中文提示" --kind bug
    python -m harness task brief QA72   # 生成精简子 Agent 任务包
    ```
-2. **收到子 Agent 回执后立刻落盘**（由 CLI 硬校验，缺字段直接报错）：
+2. **收到子 Agent 回执后先质检再落盘**（由 CLI 硬校验，缺字段直接报错）：
+   - **总控把关**：如果子 Agent 已经拿到了截图、界面名或提示文案，却没去查**当前代码/Prefab 实现**就只回一句“单帧不确定/待验证”，**立刻打回让它补查当前代码**，不许照单全收写成“待查”！
    ```powershell
    python -m harness task update QA72 --verdict need_fix --fact "SilentDownloadVM.cs:794 硬编码中文提示" --files "client/Assets/.../SilentDownloadVM.cs" --verify "切英语触发未初始化提示，确认走多语言表"
    ```
-   - `need_fix` **必须**同时提供 `--fact`、`--files`、`--verify`；
-   - `blocked_external` **必须**通过 `--note` 写明缺哪项本机测不了的外部条件。
+   - `need_fix`（确认需改代码）**必须**同时提供 `--fact`、`--files`、`--verify`；
+   - `fixed_pending_qa`（代码已修，待复测）**必须**通过 `--fact` 写明当前代码里的修复位置仍在生效；
+   - `blocked_external`（真缺线索/卡外部）**必须**通过 `--note` 写明缺哪项本机查不到的外部线索（仅限无图无界面或本机不可测的外部条件）。
 3. **派子 Agent 修代码前先标 `fixing` 防撞车**：
    ```powershell
    python -m harness task update QA72 --status fixing --owner subagent

@@ -221,6 +221,17 @@ class TestTaskBoard:
         with pytest.raises(TaskValidationError, match="blocked_external"):
             update_task(tmp_path, "QA74", verdict="blocked_external")
 
+        # fixed_pending_qa 缺 fact 必须拒收，补全后正常落盘并渲染“代码已修，待复测”
+        add_task(tmp_path, "QA54", "离线剧情奖励动画", kind="bug")
+        with pytest.raises(TaskValidationError, match="fixed_pending_qa"):
+            update_task(tmp_path, "QA54", verdict="fixed_pending_qa")
+        update_task(
+            tmp_path,
+            "QA54",
+            verdict="fixed_pending_qa",
+            fact="LocalPlayBridge.cs:670-675 抑制重复建造同步逻辑仍在当前代码中",
+        )
+
         # fact 超长必须拒收（防 30KB 流水账）
         with pytest.raises(TaskValidationError, match="过长"):
             update_task(tmp_path, "QA72", fact="x" * 450)

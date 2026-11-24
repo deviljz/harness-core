@@ -17,13 +17,14 @@ from typing import Any
 
 VALID_KINDS = ("bug", "ui", "feat", "other")
 VALID_STATUSES = ("open", "fixing", "done", "skipped")
-VALID_VERDICTS = ("pending", "no_fix", "need_fix", "blocked_external", "done")
+VALID_VERDICTS = ("pending", "no_fix", "need_fix", "fixed_pending_qa", "blocked_external", "done")
 
 VERDICT_LABELS = {
     "pending": "待查",
     "no_fix": "无需改代码",
     "need_fix": "确认需改代码",
-    "blocked_external": "卡在外部条件",
+    "fixed_pending_qa": "代码已修，待复测",
+    "blocked_external": "真缺线索/卡外部",
     "done": "已完成",
 }
 
@@ -265,9 +266,14 @@ def update_task(
         if missing:
             raise TaskValidationError("verdict=need_fix 校验未通过，缺少: " + "；".join(missing))
 
+    if new_verdict == "fixed_pending_qa" and not new_fact:
+        raise TaskValidationError(
+            "verdict=fixed_pending_qa 必须通过 --fact 写明当前代码中确认仍在生效的修复位置（文件:行号）"
+        )
+
     if new_verdict == "blocked_external" and not new_note:
         raise TaskValidationError(
-            "verdict=blocked_external 必须通过 --note 写明具体缺哪项本机无法自测的外部条件（如 QA 原日志/真机复现）"
+            "verdict=blocked_external 必须通过 --note 写明具体缺哪项本机无法自测的外部条件（如 QA 原图/原日志/真机复现）"
         )
 
     # 并行改代码文件碰撞检查
@@ -326,12 +332,12 @@ def build_subagent_brief(root: Path, task_id: str, *, mode: str = "auto") -> str
         [
             f"任务：独立只读核查 [{item['id']}] {item['title']}",
             f"- 遵循技能：`{skill_hint}` 与项目 `AGENTS.md`",
-            "- 纪律：不改业务代码；本机能查的源码/日志/已有测试脚本全部自己验完再回报。",
+            "- 纪律：不改业务代码；看到截图/文案/报错必须追进当前代码/Prefab 核实真实实现，禁止只挑历史证据毛病用“待验证”交差；本机能查能跑的自己先验完。",
             "- 回执格式（控制在 10 行内，方便主总控直接录入 `python -m harness task update`）：",
-            "  1. 定性：`no_fix`（无需改代码） / `need_fix`（确认需改代码） / `blocked_external`（仅限本机做不了的外部条件）",
-            "  2. 事实：精确 `文件:行号` 与实测证据（≤300字）",
+            "  1. 定性：`need_fix`（当前代码可见缺陷） / `fixed_pending_qa`（修复逻辑仍在当前代码，待新包/QA复测） / `no_fix`（设计如此/无需改） / `blocked_external`（真缺图/界面线索，打回 QA）",
+            "  2. 事实：精确 `文件:行号` 与当前代码核查结论（≤300字）",
             "  3. 若为 `need_fix`：明确给出 `--files`（只动哪些文件）和 `--verify`（验收命令/现象）",
-            "  4. 若为 `blocked_external`：写清具体缺哪项外部条件",
+            "  4. 若为 `blocked_external`：写清具体缺哪项外部线索",
         ]
     )
 

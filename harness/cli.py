@@ -502,10 +502,10 @@ def task_update(
 @click.option("--json", "as_json", is_flag=True, help="输出 JSON")
 def task_list(filter_status: str, as_json: bool):
     from .adapters.codex import load_tasks
-    from .adapters.codex.tasks import VERDICT_LABELS
+    from .adapters.codex.tasks import VERDICT_LABELS, _item_sort_key
 
     data = load_tasks(_resolve_task_root())
-    items = data.get("items", [])
+    items = sorted(data.get("items", []), key=_item_sort_key)
     if filter_status.lower() != "all":
         items = [it for it in items if it.get("status") == filter_status.lower()]
     if as_json:

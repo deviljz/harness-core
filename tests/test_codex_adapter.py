@@ -272,9 +272,11 @@ class TestTaskBoard:
             verify="断网过关回网触发真实 GET",
         )
 
-        # 自动渲染紧凑 1 页总表且生成子 Agent 任务包
+        # 自动渲染紧凑总表：fixing / need_fix 置顶，done / fixed_pending_qa 靠后
         md = tasks_md_path(tmp_path).read_text(encoding="utf-8")
-        assert "QA72" in md and "QA74" in md
+        assert "QA72" in md and "QA74" in md and "QA54" in md
+        assert md.index("| `QA74` |") < md.index("| `QA54` |") < md.index("| `QA72` |")
+        assert md.index("## 优先处理") < md.index("| 编号 | 类型 |")
         brief = build_subagent_brief(tmp_path, "QA74")
         assert "SilentDownloadVM.cs" in brief
         assert "严禁越界修改范围外文件" in brief

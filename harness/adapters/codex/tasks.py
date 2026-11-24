@@ -106,18 +106,66 @@ def _check_file_collisions(
     return conflicts
 
 
+def _item_sort_key(it: dict[str, Any]) -> tuple[int, str]:
+    """按紧急度排序：正在修 > 确认需改代码 > 待查 > 卡外部 > 代码已修待复测 > 无需改 > 已完成/跳过。"""
+    status = it.get("status", "open")
+    verdict = it.get("verdict", "pending")
+    tid = str(it.get("id", ""))
+    if status == "fixing":
+        rank = 0
+    elif status in ("done", "skipped"):
+        rank = 6
+    elif verdict == "need_fix":
+        rank = 1
+    elif verdict == "pending":
+        rank = 2
+    elif verdict == "blocked_external":
+        rank = 3
+    elif verdict == "fixed_pending_qa":
+        rank = 4
+    else:
+        rank = 5
+    return (rank, tid)
+
+
 def render_tasks_markdown(data: dict[str, Any]) -> str:
-    """渲染紧凑 1 页总表，每次覆盖写入，绝不无限追加。"""
+    """渲染按紧急度置顶的紧凑总表，每次覆盖写入，绝不无限追加。"""
     project = data.get("project", "project")
-    items: list[dict[str, Any]] = data.get("items", [])
+    items: list[dict[str, Any]] = sorted(data.get("items", []), key=_item_sort_key)
+
+    n_fixing = sum(1 for it in items if it.get("status") == "fixing")
+    n_need_fix = sum(1 for it in items if it.get("status") == "open" and it.get("verdict") == "need_fix")
+    n_pending = sum(1 for it in items if it.get("status") == "open" and it.get("verdict") == "pending")
+    n_retest = sum(1 for it in items if it.get("status") == "open" and it.get("verdict") == "fixed_pending_qa")
+    n_closed = sum(1 for it in items if it.get("status") in ("done", "skipped"))
+
     lines = [
-        f"# {project} 任务总板（自动生成，覆盖更新）",
+        f"# {project} 任务总板（自动生成，按紧急度置顶）",
         "",
-        f"> 更新时间：{_now_str()} | 共 {len(items)} 条",
-        "",
-        "| 编号 | 类型 | 状态 | 定性 | 涉及文件 | 摘要 / 结论 |",
-        "|---|---|---|---|---|---|",
+        (
+            f"> 更新时间：{_now_str()} | 共 {len(items)} 条"
+            f"（正在修 {n_fixing} / 需改代码 {n_need_fix} / 待查 {n_pending} / 待复测 {n_retest} / 已完成或跳过 {n_closed}）"
+        ),
     ]
+
+    need_fix_items = [
+        it for it in items if (it.get("verdict") == "need_fix" or it.get("status") == "fixing") and it.get("status") not in ("done", "skipped")
+    ]
+    if need_fix_items:
+        lines.extend(["", "## 优先处理（正在修 / 确认需改代码）"])
+        for it in need_fix_items:
+            lines.append(
+                f"- **{it['id']}**（{it.get('status')}）：改动 `{', '.join(it.get('files') or [])}`；"
+                f"验收 `{it.get('verify', '')}`"
+            )
+
+    lines.extend(
+        [
+            "",
+            "| 编号 | 类型 | 状态 | 定性 | 涉及文件 | 摘要 / 结论 |",
+            "|---|---|---|---|---|---|",
+        ]
+    )
     for it in items:
         tid = it.get("id", "")
         kind = it.get("kind", "other")
@@ -129,14 +177,6 @@ def render_tasks_markdown(data: dict[str, Any]) -> str:
             summary = summary[:87] + "..."
         lines.append(f"| `{tid}` | {kind} | {status} | {verdict} | {files} | {summary} |")
 
-    need_fix_items = [it for it in items if it.get("verdict") == "need_fix" and it.get("status") != "done"]
-    if need_fix_items:
-        lines.extend(["", "## 待修 / 正在修的任务包"])
-        for it in need_fix_items:
-            lines.append(
-                f"- **{it['id']}**（{it.get('status')}）：改动 `{', '.join(it.get('files') or [])}`；"
-                f"验收 `{it.get('verify', '')}`"
-            )
     lines.append("")
     return "\n".join(lines)
 

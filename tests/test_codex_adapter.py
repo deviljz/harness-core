@@ -14,9 +14,11 @@ from harness.adapters.codex import (
     clear_tasks,
     codex_source_dir,
     ensure_handoff,
+    evaluate_diff_entries,
     init_codex_project,
     inspect_project,
     list_tracked_skills,
+    parse_numstat,
     pull_from_codex_home,
     sync_status,
     sync_to_codex_home,
@@ -137,6 +139,7 @@ class TestCodexSync:
         assert (src / "AGENTS.md").is_file()
         skills = list_tracked_skills(src)
         assert "bug-investigation" in skills
+        assert "bug-fix-verify" in skills
         assert "codex-project-init" in skills
         assert "thin-orchestrator" in skills
         assert "existing-flow-review" in skills
@@ -336,6 +339,78 @@ class TestTaskBoard:
             r_brief = runner.invoke(main, ["task", "brief", "UI-01"])
             assert r_brief.exit_code == 0
             assert "ShopPanel.cs" in r_brief.output
+        finally:
+            os.chdir(cwd)
+
+
+class TestDiffGuard:
+    def test_green_for_small_fix_and_subtraction_refactor(self):
+        # 类似 QA81：1 个运行文件 +29/-17（净增 +12）+ 1 个测试文件 +200 → 绿灯
+        entries = parse_numstat(
+            "29\t17\tclient/Packages/ImGamePkg/Runtime/Game/Business/Activity/StarCollection/StarCollectionVM.cs\n"
+            "200\t0\tclient/Packages/ImGamePkg/Editor/LocalPlaySnapshotCheck.StarQa.cs\n"
+            "50\t0\tdoc/report.md\n"
+        )
+        res = evaluate_diff_entries(entries, hub_files=["LocalPlayBridge.cs", "LoginMgr.cs"])
+        assert res["status"] == "green"
+        assert res["runtime"]["files_count"] == 1
+        assert res["runtime"]["net"] == 12
+        assert res["non_runtime"]["files_count"] == 2
+
+        # 减法修 bug：加 30 行删 90 行（净增 -60）→ 绿灯
+        entries_sub = parse_numstat("30\t90\tsrc/foo.cs\n")
+        res_sub = evaluate_diff_entries(entries_sub, max_net_added_lines=80)
+        assert res_sub["status"] == "green"
+        assert res_sub["runtime"]["net"] == -60
+
+    def test_red_when_exceeding_files_lines_or_touching_hub_file(self):
+        entries = parse_numstat(
+            "50\t0\tclient/Packages/ImGamePkg/Runtime/Game/Core/LocalPlayBridge.cs\n"
+            "30\t0\tclient/Packages/ImGamePkg/Runtime/A.cs\n"
+            "20\t0\tclient/Packages/ImGamePkg/Runtime/B.cs\n"
+            "10\t0\tclient/Packages/ImGamePkg/Runtime/C.cs\n"
+        )
+        res = evaluate_diff_entries(
+            entries,
+            max_runtime_files=3,
+            max_net_added_lines=80,
+            hub_files=["LocalPlayBridge.cs"],
+        )
+        assert res["status"] == "red"
+        assert len(res["triggers"]) == 3
+        assert "client/Packages/ImGamePkg/Runtime/Game/Core/LocalPlayBridge.cs" in res["touched_hubs"]
+
+    def test_cli_diff_guard_in_git_repo(self, tmp_path: Path):
+        import subprocess
+
+        subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+        subprocess.run(["git", "config", "user.email", "t@t.com"], cwd=tmp_path, check=True)
+        subprocess.run(["git", "config", "user.name", "t"], cwd=tmp_path, check=True)
+        (tmp_path / "src").mkdir()
+        (tmp_path / "src" / "Hub.cs").write_text("class Hub {}\n", encoding="utf-8")
+        (tmp_path / ".harness").mkdir()
+        (tmp_path / ".harness" / "config.yaml").write_text(
+            "project: demo\nagent: codex\ndiff_budget:\n  max_runtime_files: 3\n  max_net_added_lines: 80\n  hub_files:\n    - Hub.cs\n",
+            encoding="utf-8",
+        )
+        subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=tmp_path, check=True)
+
+        # 未改前应 GREEN (exit 0)
+        runner = CliRunner()
+        cwd = os.getcwd()
+        os.chdir(tmp_path)
+        try:
+            r0 = runner.invoke(main, ["diff-guard"])
+            assert r0.exit_code == 0, r0.output
+
+            # 改到核心枢纽文件 Hub.cs → 应 RED (exit 2)
+            (tmp_path / "src" / "Hub.cs").write_text("class Hub { int x = 1; }\n", encoding="utf-8")
+            r1 = runner.invoke(main, ["diff-guard", "--json"])
+            assert r1.exit_code == 2
+            data = json.loads(r1.output)
+            assert data["status"] == "red"
+            assert "src/Hub.cs" in data["touched_hubs"]
         finally:
             os.chdir(cwd)
 

@@ -11,7 +11,7 @@ description: 在同一个主对话里连续处理多个 bug、UI 微调或小功
 
 - **以下重活一律派给全新干净的子 Agent**（零历史污染，严格守对应 Skill）：
   - 翻大量日志、跨文件查因（给子 Agent `bug-investigation` 要求）
-  - 修改业务代码、跑编译/打包/回归验证（给子 Agent `existing-flow-review` 或 `web-prototype-to-unity` 要求）
+  - 修改业务代码、跑编译/打包/回归验证（给子 Agent `bug-fix-verify` + `existing-flow-review` 要求；修完必须过 `python -m harness diff-guard` 和 1 轮独立干净子 Agent 审 Diff，严禁把多条 bug 揉进一笔巨无霸提交）
   - 大规模截图对比、资源扫描
 - **连续推进，不要查完 1 条就停下来交差**：
   - 用户要求“继续处理任务板 / 查这一批”时，主总控应**自动顺延推进**（只读调查互不冲突，可一次并行派 2～3 个子 Agent，或一条落盘后立刻派下一条）。

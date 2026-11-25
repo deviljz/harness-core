@@ -96,6 +96,15 @@ class GateConfig(BaseModel):
     max_age_seconds: int = 300
 
 
+class DiffBudgetConfig(BaseModel):
+    """改动预算硬闸门配置（防 AI 过度防御、擅自大改机制或误碰核心枢纽文件）"""
+    model_config = ConfigDict(extra="allow")
+    max_runtime_files: int = 3
+    max_net_added_lines: int = 80
+    hub_files: list[str] = Field(default_factory=list)
+    ignore_paths: list[str] = Field(default_factory=list)
+
+
 class HarnessConfig(BaseModel):
     """顶层 config"""
     model_config = ConfigDict(extra="allow")
@@ -111,6 +120,7 @@ class HarnessConfig(BaseModel):
     review: ReviewConfig = Field(default_factory=ReviewConfig)
     targets: list[TargetConfig] = Field(default_factory=list)
     gate: GateConfig = Field(default_factory=GateConfig)
+    diff_budget: DiffBudgetConfig = Field(default_factory=DiffBudgetConfig)
     anti_patterns: dict[str, list[AntiPatternRule]] = Field(default_factory=dict)
     core_modules_coverage: list[CoreModuleEntry] = Field(default_factory=list)
 

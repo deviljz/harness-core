@@ -1,4 +1,5 @@
-"""Codex 适配层：仓库轻量扫描、项目初始化、全局配置同步、4 栏换班状态文件。"""
+"""Codex 适配层：仓库轻量扫描、项目初始化、全局配置同步、4 栏换班状态文件、改动预算硬闸门。"""
+from .diff_guard import evaluate_diff_entries, parse_numstat, run_diff_guard
 from .handoff import ensure_handoff, handoff_path, project_key
 from .init import init_codex_project
 from .scanner import inspect_project
@@ -29,14 +30,17 @@ __all__ = [
     "clear_tasks",
     "codex_source_dir",
     "ensure_handoff",
+    "evaluate_diff_entries",
     "handoff_path",
     "init_codex_project",
     "inspect_project",
     "list_tracked_skills",
     "load_tasks",
+    "parse_numstat",
     "project_key",
     "pull_from_codex_home",
     "resolve_codex_home",
+    "run_diff_guard",
     "sync_status",
     "sync_to_codex_home",
     "sync_to_opencode",

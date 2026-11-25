@@ -571,6 +571,73 @@ def task_clear(clear_all: bool):
 
 
 # ════════════════════════════════════════════════════════════════════
+# diff-guard — 改动预算硬闸门（防过度防御 / 擅自大改 / 巨无霸提交）
+# ════════════════════════════════════════════════════════════════════
+
+
+@main.command("diff-guard", help="改动预算硬闸门：检查运行代码文件数、净增行数与高危核心枢纽文件（超限返回 exit 2）")
+@click.option("--base", type=str, default="HEAD", show_default=True, help="git diff 基线")
+@click.option("--staged", is_flag=True, help="只检查暂存区（git diff --cached）")
+@click.option("--max-files", type=int, default=None, help="覆盖运行代码文件数上限（默认读 config 或 3）")
+@click.option("--max-net-lines", type=int, default=None, help="覆盖运行代码净增行数上限（默认读 config 或 80）")
+@click.option("--json", "as_json", is_flag=True, help="输出 JSON")
+def diff_guard_cmd(base: str, staged: bool, max_files: int | None, max_net_lines: int | None, as_json: bool):
+    from .adapters.codex import run_diff_guard
+
+    try:
+        cfg = load_config()
+        root = _project_root(find_config())
+        b = cfg.diff_budget
+        mf = max_files if max_files is not None else b.max_runtime_files
+        ml = max_net_lines if max_net_lines is not None else b.max_net_added_lines
+        hubs = list(b.hub_files)
+        ignores = list(b.ignore_paths) + list(cfg.ignore_paths_global)
+    except ConfigError:
+        root = Path.cwd().resolve()
+        mf = max_files if max_files is not None else 3
+        ml = max_net_lines if max_net_lines is not None else 80
+        hubs = []
+        ignores = []
+
+    try:
+        res = run_diff_guard(
+            root,
+            base=base,
+            staged=staged,
+            max_runtime_files=mf,
+            max_net_added_lines=ml,
+            hub_files=hubs,
+            extra_ignore=ignores,
+        )
+    except RuntimeError as e:
+        err_console.print(f"[red]✗ diff-guard error: {e}[/red]")
+        sys.exit(1)
+
+    if as_json:
+        click.echo(json.dumps(res, ensure_ascii=False, indent=2))
+    else:
+        rt = res["runtime"]
+        nrt = res["non_runtime"]
+        if res["status"] == "green":
+            console.print(
+                f"[green]✓ diff-guard GREEN[/green] ({res['scope']}): "
+                f"runtime {rt['files_count']} file(s), +{rt['added']}/-{rt['deleted']} (net {rt['net']:+d}); "
+                f"tests/docs {nrt['files_count']} file(s) (+{nrt['added']}/-{nrt['deleted']})"
+            )
+        else:
+            console.print(
+                f"[red]✗ diff-guard RED[/red] ({res['scope']}): "
+                f"runtime {rt['files_count']} file(s), +{rt['added']}/-{rt['deleted']} (net {rt['net']:+d}); "
+                f"tests/docs {nrt['files_count']} file(s) (+{nrt['added']}/-{nrt['deleted']})"
+            )
+            for t in res["triggers"]:
+                console.print(f"  [yellow]![/yellow] {t}")
+
+    if res["status"] == "red":
+        sys.exit(2)
+
+
+# ════════════════════════════════════════════════════════════════════
 # baseline — 对标参考实现，扫覆盖度差距写入 spec
 # ════════════════════════════════════════════════════════════════════
 

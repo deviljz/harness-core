@@ -187,6 +187,7 @@ def sync_to_codex_home(
 
 OPENCODE_SHARED_SKILLS: tuple[str, ...] = (
     "bug-investigation",
+    "bug-fix-verify",
     "existing-flow-review",
     "thin-orchestrator",
 )

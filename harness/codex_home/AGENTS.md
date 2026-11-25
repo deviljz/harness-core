@@ -4,6 +4,7 @@
 
 - **同一对话连做多条 bug / 多个 UI 微调 / 多个小功能**：按 `thin-orchestrator` 技能走**主线程薄总控 + 干净子 Agent 按单干活**，并用 `python -m harness task` 记录状态、硬校验改动文件与验收标准、防并行撞车，不要让主对话亲自啃大量日志撑爆上下文。
 - **查因/调查类任务**（定位 bug、核查协议/日志/时序）：按 `bug-investigation` 技能走 4 条轻护栏（默认只读、本机能验的自己验完、第一行给 3 秒定性、需改代码附 4 行修复包）。
+- **修 bug / 改代码任务**：按 `bug-fix-verify` 技能走质量闭环——动手前先过**改动预算硬闸门**（≤3 个运行文件、净增 ≤80 行、不加新状态/新锁、不动核心枢纽文件公共状态机；**减法优先**，超预算先给 5 行方向卡请示），改完跑 `python -m harness diff-guard` + 独立干净子 Agent 审 diff，一单一小提交。
 - **小步对照微调类**（UI/动效/QA 单点修复）：沿原流程改完立刻跑项目已有验证脚本或对照报告闭环，不为小改动写重型 Spec。
 - **新项目接入或整理项目入口**：使用 `codex-project-init` 技能，运行 `python -m harness init --agent codex --inspect-json` 自动扫描并维护 ≤40 行的薄项目 `AGENTS.md`，不把本文件里的全局规则重复抄进项目。
 - **换大话题 / 跨天结项时**：用 `long-task-handoff`（或 `python -m harness handoff`）**覆写精简** 1 页 4 栏状态文件（严格 ≤60 行，禁止无限追加成流水账）；多条任务明细一律放 `python -m harness task`。

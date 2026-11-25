@@ -46,9 +46,11 @@ description: 在同一个主对话里连续处理多个 bug、UI 微调或小功
    python -m harness task update QA72 --status done --verdict done --fact "已改用多语言 key，英语实测通过"
    ```
 
-## 3. 调用外部 CLI（如 Kimi）的纪律
+## 3. 调用外部 CLI（Kimi / OpenCode）的纪律与硬兜底
 
-- 交给 Kimi CLI 等外部工具时，同样传 `python -m harness task brief <id>` 的紧凑模板（明确只读、限 10 行结构化回执）。
+- 派给 **Kimi CLI** 时，必须显式带上 `--skills-dir C:\Users\pc\.agents\skills`（复用与 OpenCode 共享的 4 个核心 Skill），并直接传入 `python -m harness task brief <id>` 的完整任务包（内含项目决策卡提醒、3 问自检与改动预算上限）。
+- 派给 **OpenCode** 时，同样传入 `python -m harness task brief <id>`；OpenCode 会自动读取 `~/.config/opencode/AGENTS.md` 与 `C:\Users\pc\.agents\skills`。
+- **总控收口硬兜底**：无论由 Kimi、OpenCode 还是原生子 Agent 修改代码，完成后主总控必须自己跑一次 `python -m harness diff-guard` 核验预算和核心枢纽文件，绝不靠外部工具自觉。
 - 等待后台任务期间**不要连续刷屏发十条碎片进度消息**；等结果回来后一次核对并录入任务板再汇总。
 
 ## 4. 向用户汇报：只给一张 3 秒能看懂的总表

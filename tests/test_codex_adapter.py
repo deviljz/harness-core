@@ -296,6 +296,8 @@ class TestTaskBoard:
         brief = build_subagent_brief(tmp_path, "QA74")
         assert "SilentDownloadVM.cs" in brief
         assert "严禁越界修改范围外文件" in brief
+        assert "diff-guard" in brief
+        assert "改动预算硬闸门" in brief
 
         removed = clear_tasks(tmp_path, only_done=True)
         assert removed == 1

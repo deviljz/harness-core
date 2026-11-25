@@ -354,16 +354,17 @@ def build_subagent_brief(root: Path, task_id: str, *, mode: str = "auto") -> str
 
     kind = item.get("kind", "bug")
     if actual_mode == "fix":
-        skill_hint = "existing-flow-review" if kind != "ui" else "web-prototype-to-unity / existing-flow-review"
+        skill_hint = "bug-fix-verify + existing-flow-review" if kind != "ui" else "bug-fix-verify + web-prototype-to-unity / existing-flow-review"
         files_str = ", ".join(item.get("files") or []) or "<未指定>"
         return "\n".join(
             [
                 f"任务：修复 [{item['id']}] {item['title']}",
-                f"- 遵循技能：`{skill_hint}` 与项目 `AGENTS.md`（优先复用原流程、选最小改法）",
+                f"- 遵循技能：`{skill_hint}`，先读项目 `AGENTS.md` 及已确认取舍/决策清单（不翻旧案、优先复用原流程）",
                 f"- 已核实根因与证据：{item.get('fact') or '<见主任务说明>'}",
                 f"- 改动文件边界（严禁越界修改范围外文件，防并行撞车）：{files_str}",
-                f"- 验收标准：{item.get('verify') or '<必须跑最小回归验证>'}",
-                "- 回执格式（控制在 8 行内）：改了哪几处（文件:行号） / 实际跑了什么验证及结果 / 是否存在未验证项。",
+                "- 改动预算硬闸门：运行代码 ≤3 文件、净增 ≤80 行、不新增状态变量/缓存/锁、减法优先；超限或需改核心枢纽文件公共状态机必须先停下回传 5 行方向卡请示。",
+                f"- 验收标准（先红后绿）：{item.get('verify') or '<必须跑最小回归验证>'}；改完必须自跑 `python -m harness diff-guard`。",
+                "- 回执格式（控制在 8 行内）：改了哪几处（文件:行号）+ diff-guard 结果 / 修前红 vs 修后绿证据 / 是否存在未验证项。",
             ]
         )
 
@@ -371,8 +372,9 @@ def build_subagent_brief(root: Path, task_id: str, *, mode: str = "auto") -> str
     return "\n".join(
         [
             f"任务：独立只读核查 [{item['id']}] {item['title']}",
-            f"- 遵循技能：`{skill_hint}` 与项目 `AGENTS.md`",
+            f"- 遵循技能：`{skill_hint}`，先读项目 `AGENTS.md` 及已确认取舍/决策清单（已拍板取舍直接过滤，不按 P0 过度报警）",
             "- 纪律：不改业务代码；看到截图/文案/报错必须追进当前代码/Prefab 核实真实实现，禁止只挑历史证据毛病用“待验证”交差；本机能查能跑的自己先验完。",
+            "- 开口前 3 问自检：为何正常流程没挂（触发前提与线上概率）/ 改造前旧版是不是也这样 / 项目决策清单是否已接受。",
             "- 回执格式（控制在 10 行内，方便主总控直接录入 `python -m harness task update`）：",
             "  1. 定性：`need_fix`（当前代码可见缺陷） / `fixed_pending_qa`（修复逻辑仍在当前代码，待新包/QA复测） / `no_fix`（设计如此/无需改） / `blocked_external`（真缺图/界面线索，打回 QA）",
             "  2. 事实：精确 `文件:行号` 与当前代码核查结论（≤300字）",

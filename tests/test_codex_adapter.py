@@ -150,7 +150,7 @@ class TestCodexSync:
         # OH 单项目 Sentry 规则应已从全局移除
         global_text = (src / "AGENTS.md").read_text(encoding="utf-8")
         assert "OH-TEST-BUILD-NO-SENTRY-SYMBOL-UPLOAD" not in global_text
-        assert "P0/P1 防过度报警硬门槛" in global_text
+        assert "收益/复杂度红线" in global_text
 
     def test_sync_to_opencode_preserves_existing_skills(self, tmp_path: Path):
         fake_oc = tmp_path / "opencode_cfg"

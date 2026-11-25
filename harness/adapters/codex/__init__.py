@@ -9,6 +9,7 @@ from .sync import (
     resolve_codex_home,
     sync_status,
     sync_to_codex_home,
+    sync_to_opencode,
 )
 from .tasks import (
     TaskValidationError,
@@ -38,6 +39,7 @@ __all__ = [
     "resolve_codex_home",
     "sync_status",
     "sync_to_codex_home",
+    "sync_to_opencode",
     "tasks_json_path",
     "tasks_md_path",
     "update_task",

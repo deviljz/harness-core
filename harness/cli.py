@@ -328,6 +328,7 @@ def doctor():
     help="同步范围",
 )
 @click.option("--codex-home", type=click.Path(path_type=Path), default=None, help="显式指定 Codex 配置目录（默认 $CODEX_HOME 或 ~/.codex）")
+@click.option("--with-opencode", is_flag=True, help="同时将全局 AGENTS.md 与核心调查/复核 Skill 同步给本机 OpenCode（~/.config/opencode 与 ~/.agents/skills）")
 @click.option("--json", "as_json", is_flag=True, help="输出 JSON")
 def sync_cmd(
     pull: bool,
@@ -335,9 +336,10 @@ def sync_cmd(
     dry_run: bool,
     only: str,
     codex_home: Path | None,
+    with_opencode: bool,
     as_json: bool,
 ):
-    from .adapters.codex import pull_from_codex_home, sync_status, sync_to_codex_home
+    from .adapters.codex import pull_from_codex_home, sync_status, sync_to_codex_home, sync_to_opencode
 
     if show_status:
         st = sync_status(codex_home=codex_home)
@@ -357,6 +359,8 @@ def sync_cmd(
         res = pull_from_codex_home(codex_home=codex_home, only=only.lower(), dry_run=dry_run)
     else:
         res = sync_to_codex_home(codex_home=codex_home, only=only.lower(), dry_run=dry_run)
+        if with_opencode:
+            res["opencode"] = sync_to_opencode(dry_run=dry_run)
 
     if as_json:
         click.echo(json.dumps(res, ensure_ascii=False, indent=2))
@@ -373,6 +377,13 @@ def sync_cmd(
                       f"{' ...' if len(res['unchanged']) > 6 else ''}[/dim]")
     for miss in res.get("skipped_missing", []):
         console.print(f"  [yellow]! missing in codex_home:[/yellow] {miss}")
+    if "opencode" in res:
+        oc = res["opencode"]
+        console.print(f"{prefix}[bold]{oc['direction']}[/bold] ({oc['opencode_config_dir']}, {oc['shared_skills_dir']})")
+        for item in oc["updated"]:
+            console.print(f"  [green]✓ updated:[/green] {item}")
+        if oc["unchanged"]:
+            console.print(f"  [dim]unchanged ({len(oc['unchanged'])}): {', '.join(oc['unchanged'])}[/dim]")
 
 
 # ════════════════════════════════════════════════════════════════════

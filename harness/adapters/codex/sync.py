@@ -185,6 +185,69 @@ def sync_to_codex_home(
     }
 
 
+OPENCODE_SHARED_SKILLS: tuple[str, ...] = (
+    "bug-investigation",
+    "existing-flow-review",
+    "thin-orchestrator",
+)
+
+
+def sync_to_opencode(
+    *,
+    opencode_config_dir: Path | None = None,
+    shared_skills_dir: Path | None = None,
+    dry_run: bool = False,
+    source_dir: Path | None = None,
+) -> dict[str, Any]:
+    """把同一份全局 AGENTS.md 与核心调查/复核 Skill 同步给本机 OpenCode（不碰 OpenCode 原有技能）。"""
+    cfg_dir = (opencode_config_dir or (Path.home() / ".config" / "opencode")).expanduser().resolve()
+    skills_dir = (shared_skills_dir or (Path.home() / ".agents" / "skills")).expanduser().resolve()
+    src = (source_dir or codex_source_dir()).resolve()
+
+    updated: list[str] = []
+    unchanged: list[str] = []
+    backups: list[str] = []
+
+    src_agents = src / "AGENTS.md"
+    dst_agents = cfg_dir / "AGENTS.md"
+    if src_agents.is_file():
+        need = (not dst_agents.is_file()) or (_file_sha256(src_agents) != _file_sha256(dst_agents))
+        if need:
+            if not dry_run:
+                cfg_dir.mkdir(parents=True, exist_ok=True)
+                if dst_agents.is_file():
+                    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+                    bak = cfg_dir / f"AGENTS.md.before-harness-sync-{ts}.bak"
+                    shutil.copy2(dst_agents, bak)
+                    backups.append(bak.name)
+                shutil.copy2(src_agents, dst_agents)
+            updated.append("opencode/AGENTS.md")
+        else:
+            unchanged.append("opencode/AGENTS.md")
+
+    for skill in OPENCODE_SHARED_SKILLS:
+        s_dir = src / "skills" / skill
+        if not s_dir.is_dir():
+            continue
+        d_dir = skills_dir / skill
+        if _dir_manifest(s_dir) == _dir_manifest(d_dir):
+            unchanged.append(f".agents/skills/{skill}")
+        else:
+            if not dry_run:
+                _copy_skill_dir(s_dir, d_dir)
+            updated.append(f".agents/skills/{skill}")
+
+    return {
+        "direction": "push_to_opencode",
+        "dry_run": dry_run,
+        "opencode_config_dir": cfg_dir.as_posix(),
+        "shared_skills_dir": skills_dir.as_posix(),
+        "updated": updated,
+        "unchanged": unchanged,
+        "backups": backups,
+    }
+
+
 def pull_from_codex_home(
     *,
     codex_home: Path | None = None,

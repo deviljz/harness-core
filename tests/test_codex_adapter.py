@@ -151,6 +151,7 @@ class TestCodexSync:
         global_text = (src / "AGENTS.md").read_text(encoding="utf-8")
         assert "OH-TEST-BUILD-NO-SENTRY-SYMBOL-UPLOAD" not in global_text
         assert "收益/复杂度红线" in global_text
+        assert "AUTONOMY-GATE-v1" in global_text
 
     def test_sync_to_opencode_preserves_existing_skills(self, tmp_path: Path):
         fake_oc = tmp_path / "opencode_cfg"

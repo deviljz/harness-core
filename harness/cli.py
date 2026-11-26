@@ -561,6 +561,38 @@ def task_brief(task_id: str, mode: str):
     click.echo(text)
 
 
+@task_group.command("done-check", help="长任务收尾硬检：仍有未完成的必做单时返回 exit 2，防止半路见好就收")
+@click.option("--prefix", type=str, default=None, help="只检查指定编号前缀的任务（如 MUMU- 或 OFFLINE-）")
+@click.option("--kind", type=click.Choice(["bug", "ui", "feat", "other"], case_sensitive=False), default=None)
+@click.option("--strict", is_flag=True, help="严格模式：除 done/skipped/blocked_external 外一律视为未完成")
+@click.option("--json", "as_json", is_flag=True, help="输出 JSON")
+def task_done_check(prefix: str | None, kind: str | None, strict: bool, as_json: bool):
+    from .adapters.codex import check_unfinished_tasks
+    from .adapters.codex.tasks import VERDICT_LABELS
+
+    res = check_unfinished_tasks(
+        _resolve_task_root(),
+        prefix=prefix,
+        kind=kind.lower() if kind else None,
+        strict=strict,
+    )
+    if as_json:
+        click.echo(json.dumps(res, ensure_ascii=False, indent=2))
+    elif res["ready"]:
+        console.print(
+            f"[green]✓ done-check GREEN[/green]（已核对 {res['matched_count']} 条，无剩余未完成必做单）"
+        )
+    else:
+        console.print(
+            f"[red]✗ done-check RED[/red]：还有 {res['unfinished_count']}/{res['matched_count']} 条未完成，禁止提前收尾："
+        )
+        for it in res["unfinished"]:
+            v = VERDICT_LABELS.get(it.get("verdict", "pending"), it.get("verdict", ""))
+            console.print(f"  - [bold]{it['id']}[/bold] [{it['status']}|{v}] {it.get('title', '')}")
+    if not res["ready"]:
+        sys.exit(2)
+
+
 @task_group.command("clear", help="清理已完成/跳过（或全部）任务单")
 @click.option("--all", "clear_all", is_flag=True, help="清空全部任务单（默认只清 done/skipped）")
 def task_clear(clear_all: bool):

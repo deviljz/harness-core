@@ -341,6 +341,19 @@ class TestTaskBoard:
             r_brief = runner.invoke(main, ["task", "brief", "UI-01"])
             assert r_brief.exit_code == 0
             assert "ShopPanel.cs" in r_brief.output
+
+            # 长任务 done-check：仍有未完成必做单时必须返回 exit 2 挡住提前收尾
+            runner.invoke(main, ["task", "add", "MUMU-SIGN", "签到模拟器验收", "--kind", "feat"])
+            runner.invoke(main, ["task", "add", "MUMU-JAR", "打罐模拟器验收", "--kind", "feat"])
+            runner.invoke(main, ["task", "update", "MUMU-SIGN", "--status", "done", "--verdict", "done", "--fact", "280金币通过"])
+            r_dc_red = runner.invoke(main, ["task", "done-check", "--prefix", "MUMU-"])
+            assert r_dc_red.exit_code == 2
+            assert "MUMU-JAR" in r_dc_red.output
+
+            # 全部完成或真实外部阻塞后，done-check 变绿 (exit 0)
+            runner.invoke(main, ["task", "update", "MUMU-JAR", "--status", "done", "--verdict", "done", "--fact", "打罐同步通过"])
+            r_dc_green = runner.invoke(main, ["task", "done-check", "--prefix", "MUMU-"])
+            assert r_dc_green.exit_code == 0
         finally:
             os.chdir(cwd)
 

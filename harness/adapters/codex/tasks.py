@@ -384,6 +384,49 @@ def build_subagent_brief(root: Path, task_id: str, *, mode: str = "auto") -> str
     )
 
 
+def check_unfinished_tasks(
+    root: Path,
+    *,
+    prefix: str | None = None,
+    kind: str | None = None,
+    strict: bool = False,
+) -> dict[str, Any]:
+    """长任务收尾硬检：只要仍有未完成的必做单（且非外部阻塞），返回 ready=False 挡住提前收尾。"""
+    data = load_tasks(root)
+    items: list[dict[str, Any]] = data.get("items", [])
+    pfx = prefix.strip().lower() if prefix else ""
+    knd = kind.strip().lower() if kind else ""
+
+    matched: list[dict[str, Any]] = []
+    unfinished: list[dict[str, Any]] = []
+    for it in items:
+        tid = str(it.get("id", ""))
+        if pfx and not tid.lower().startswith(pfx):
+            continue
+        if knd and str(it.get("kind", "")).lower() != knd:
+            continue
+        matched.append(it)
+        status = it.get("status", "open")
+        verdict = it.get("verdict", "pending")
+        if status in ("done", "skipped"):
+            continue
+        if verdict == "blocked_external":
+            continue
+        if not strict and verdict in ("no_fix", "fixed_pending_qa"):
+            continue
+        unfinished.append(it)
+
+    return {
+        "ready": len(unfinished) == 0,
+        "matched_count": len(matched),
+        "unfinished_count": len(unfinished),
+        "unfinished": unfinished,
+        "prefix": prefix or "",
+        "kind": kind or "",
+        "strict": strict,
+    }
+
+
 def clear_tasks(root: Path, *, only_done: bool = True) -> int:
     data = load_tasks(root)
     before = len(data["items"])

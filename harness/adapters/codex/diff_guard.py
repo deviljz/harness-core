@@ -11,9 +11,15 @@
 from __future__ import annotations
 
 import fnmatch
+import re
 import subprocess
 from pathlib import Path
 from typing import Any
+
+RUNTIME_TEST_FILE_RE = re.compile(
+    r"(DeviceCheck|PhysicalDriver|PlayProbe|TestPreferences|TestOnly|Mock|Dummy)",
+    re.IGNORECASE,
+)
 
 RUNTIME_EXTS: frozenset[str] = frozenset(
     {
@@ -207,5 +213,35 @@ def run_diff_guard(
         hub_files=hub_files,
         extra_ignore=extra_ignore,
     )
+    hygiene_warnings = _check_runtime_hygiene(root.resolve(), res["runtime"]["files"])
+    if hygiene_warnings:
+        res["hygiene_warnings"] = hygiene_warnings
+        res["triggers"].extend(hygiene_warnings)
+        res["status"] = "red"
     res["scope"] = "--cached" if staged else f"diff {base}"
     return res
+
+
+def _check_runtime_hygiene(root: Path, runtime_entries: list[dict[str, Any]]) -> list[str]:
+    """轻量代码卫生检查：拦截 0 空行压缩代码墙与混入 Runtime/ 的测试探针。"""
+    warnings: list[str] = []
+    for e in runtime_entries:
+        rel = e["file"]
+        added = int(e.get("added", 0))
+        if added <= 0:
+            continue
+        if "/runtime/" in f"/{rel.lower()}" and RUNTIME_TEST_FILE_RE.search(Path(rel).name):
+            warnings.append(
+                f"疑似测试/探针文件混入生产 Runtime 目录：{rel}（请移出或加显式编译宏隔离出 Release 包）"
+            )
+        if added >= 40:
+            fp = root / rel
+            if fp.is_file():
+                lines = fp.read_text(encoding="utf-8", errors="ignore").splitlines()
+                if len(lines) >= 100:
+                    blank = sum(1 for ln in lines if not ln.strip())
+                    if blank * 100 / len(lines) < 2.0:
+                        warnings.append(
+                            f"代码卫生退化：{rel}（{len(lines)} 行仅 {blank} 空行，请保留正常空行与排版，勿压成代码墙）"
+                        )
+    return warnings

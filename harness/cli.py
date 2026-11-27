@@ -670,6 +670,69 @@ def diff_guard_cmd(base: str, staged: bool, max_files: int | None, max_net_lines
 
 
 # ════════════════════════════════════════════════════════════════════
+# wt-check — Worktree 槽位硬上限与孤儿目录守卫（防拉屎不埋）
+# ════════════════════════════════════════════════════════════════════
+
+
+@main.command("wt-check", help="Worktree 槽位硬上限与孤儿残留目录守卫（超上限或有残留返回 exit 2）")
+@click.option("--max", "max_extra", type=int, default=None, help="允许的最大额外 worktree 数量（默认读配置或 2）")
+@click.option("--extra-dir", "extra_dirs", multiple=True, help="额外扫描的父目录（可多次传入，如 E:/Project）")
+@click.option("--json", "as_json", is_flag=True, help="输出机器可读 JSON")
+def wt_check_cmd(max_extra: int | None, extra_dirs: tuple[str, ...], as_json: bool):
+    from .adapters.codex import run_worktree_guard
+
+    root = Path.cwd().resolve()
+    cfg_max = 2
+    cfg_extra_roots: list[str] = []
+    cfg_prefix: str | None = None
+    cfg_path = root / ".harness" / "config.yaml"
+    if cfg_path.exists():
+        try:
+            raw = yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
+            wt_cfg = raw.get("worktree") or {}
+            if isinstance(wt_cfg, dict):
+                cfg_max = int(wt_cfg.get("max_extra", cfg_max))
+                cfg_extra_roots = [str(x) for x in (wt_cfg.get("extra_roots") or [])]
+                if wt_cfg.get("prefix"):
+                    cfg_prefix = str(wt_cfg["prefix"])
+        except Exception:
+            pass
+
+    me = max_extra if max_extra is not None else cfg_max
+    roots = list(cfg_extra_roots) + list(extra_dirs)
+    try:
+        res = run_worktree_guard(root, max_extra=me, extra_roots=roots, prefix=cfg_prefix)
+    except RuntimeError as e:
+        err_console.print(f"[red]✗ wt-check error: {e}[/red]")
+        sys.exit(1)
+
+    if as_json:
+        click.echo(json.dumps(res, ensure_ascii=False, indent=2))
+    else:
+        extras = res["extra_worktrees"]
+        orphans = res["orphan_dirs"]
+        if res["status"] == "green":
+            console.print(
+                f"[green]✓ wt-check GREEN[/green]: 额外 worktree {len(extras)}/{res['max_extra']}，孤儿残留 0"
+            )
+            for e in extras:
+                console.print(f"  - {e['path']} ({e['branch'] or 'detached'} {e['head']})")
+        else:
+            console.print(
+                f"[red]✗ wt-check RED[/red]: 额外 worktree {len(extras)}/{res['max_extra']}，孤儿残留 {len(orphans)}"
+            )
+            for e in extras:
+                console.print(f"  - [cyan]worktree[/cyan] {e['path']} ({e['branch'] or 'detached'} {e['head']})")
+            for o in orphans:
+                console.print(f"  - [yellow]orphan[/yellow]   {o}")
+            for t in res["triggers"]:
+                console.print(f"  [yellow]![/yellow] {t}")
+
+    if res["status"] == "red":
+        sys.exit(2)
+
+
+# ════════════════════════════════════════════════════════════════════
 # baseline — 对标参考实现，扫覆盖度差距写入 spec
 # ════════════════════════════════════════════════════════════════════
 

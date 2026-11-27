@@ -23,6 +23,11 @@ from .tasks import (
     tasks_md_path,
     update_task,
 )
+from .worktree_guard import (
+    evaluate_worktrees,
+    parse_worktree_porcelain,
+    run_worktree_guard,
+)
 
 __all__ = [
     "TaskValidationError",
@@ -33,16 +38,19 @@ __all__ = [
     "codex_source_dir",
     "ensure_handoff",
     "evaluate_diff_entries",
+    "evaluate_worktrees",
     "handoff_path",
     "init_codex_project",
     "inspect_project",
     "list_tracked_skills",
     "load_tasks",
     "parse_numstat",
+    "parse_worktree_porcelain",
     "project_key",
     "pull_from_codex_home",
     "resolve_codex_home",
     "run_diff_guard",
+    "run_worktree_guard",
     "sync_status",
     "sync_to_codex_home",
     "sync_to_opencode",
